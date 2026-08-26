@@ -10,6 +10,7 @@ struct TestPlayerState {
 };
 
 std::map<const Player*, TestPlayerState> playerStates;
+std::map<const WorldState*, std::map<std::string, bool>> worldFlags;
 }
 
 int Player::getStamina() const {
@@ -38,4 +39,12 @@ void setTestPlayerStamina(Player& player, int stamina) {
 
 void setTestPlayerSkill(Player& player, SkillType skill, int level) {
     playerStates[&player].skills[skill] = level;
+}
+
+bool WorldState::hasFlag(const std::string& flag) const {
+    return worldFlags[this][flag];
+}
+
+void setTestWorldFlag(WorldState& world, const std::string& flag, bool enabled) {
+    worldFlags[&world][flag] = enabled;
 }

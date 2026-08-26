@@ -3,6 +3,8 @@
 #include "TestSupport.h"
 #include "WorldState.h"
 
+#include <algorithm>
+
 void testMapContainsFiveCanonicalRooms() {
     const auto rooms = createAllRooms();
 
@@ -14,6 +16,17 @@ void testMapContainsFiveCanonicalRooms() {
     assertTrue(rooms.count("room_base") == 1, "缺少废弃实验基地");
     assertTrue(rooms.at("room_tree").getExits().count("east") == 1,
                "猴王树应有通往森林的东侧出口");
+}
+
+void testCaveContainsChipBeforeBaseInfiltration() {
+    const auto rooms = createAllRooms();
+    const auto& caveItems = rooms.at("room_cave").getItemIds();
+    const auto& baseItems = rooms.at("room_base").getItemIds();
+
+    assertTrue(std::find(caveItems.begin(), caveItems.end(), "item_chip") != caveItems.end(),
+               "回声山洞应提供进入基地所需的晶片");
+    assertTrue(std::find(baseItems.begin(), baseItems.end(), "item_chip") == baseItems.end(),
+               "基地内部不应放置用于开启自身的晶片");
 }
 
 void testLookDescribesCurrentRoomAndExits() {
@@ -84,6 +97,36 @@ void testMoveFailsWhenStaminaIsEmpty() {
     assertTrue(player.getCurrentRoomId() == "room_tree", "体力不足时应保留原位置");
 }
 
+void testBaseEntranceRequiresOpenFlag() {
+    Player player;
+    player.setCurrentRoomId("room_river");
+    setTestPlayerStamina(player, 3);
+    WorldState world;
+    auto rooms = createAllRooms();
+    GameContext context{player, world, rooms};
+
+    const ActionResult result = movePlayer(context, "east");
+
+    assertTrue(!result.success, "基地未解锁时不应允许进入");
+    assertTrue(player.getCurrentRoomId() == "room_river", "门禁拦截后应保留原位置");
+    assertTrue(player.getStamina() == 3, "门禁拦截不应消耗体力");
+}
+
+void testOpenBaseFlagAllowsEntry() {
+    Player player;
+    player.setCurrentRoomId("room_river");
+    setTestPlayerStamina(player, 3);
+    WorldState world;
+    setTestWorldFlag(world, "flag_base_open", true);
+    auto rooms = createAllRooms();
+    GameContext context{player, world, rooms};
+
+    const ActionResult result = movePlayer(context, "east");
+
+    assertTrue(result.success, "基地解锁后应允许进入");
+    assertTrue(player.getCurrentRoomId() == "room_base", "解锁后应到达基地");
+}
+
 void testClimbShortcutDoesNotCostStaminaAtLevelTwo() {
     Player player;
     player.setCurrentRoomId("room_forest");
@@ -117,11 +160,14 @@ void testClimbShortcutCostsStaminaBelowLevelTwo() {
 
 int runRoomTests() {
     testMapContainsFiveCanonicalRooms();
+    testCaveContainsChipBeforeBaseInfiltration();
     testLookDescribesCurrentRoomAndExits();
     testHelpListsCoreCommands();
     testValidMoveChangesRoomAndConsumesStamina();
     testInvalidMoveLeavesPlayerStateUnchanged();
     testMoveFailsWhenStaminaIsEmpty();
+    testBaseEntranceRequiresOpenFlag();
+    testOpenBaseFlagAllowsEntry();
     testClimbShortcutDoesNotCostStaminaAtLevelTwo();
     testClimbShortcutCostsStaminaBelowLevelTwo();
     return 0;

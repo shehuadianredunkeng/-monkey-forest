@@ -1,3 +1,8 @@
 #pragma once
 
-class WorldState {};
+#include <string>
+
+class WorldState {
+public:
+    bool hasFlag(const std::string& flag) const;
+};

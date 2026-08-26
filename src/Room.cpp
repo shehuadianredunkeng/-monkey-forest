@@ -1,6 +1,7 @@
 #include "Room.h"
 
 #include "Player.h"
+#include "WorldState.h"
 
 #include <sstream>
 
@@ -70,9 +71,9 @@ std::map<std::string, Room> createAllRooms() {
         {"room_river", Room{"room_river", "清泉河谷", "河谷的水流被银色管道截断，只剩浅浅的水洼。",
                              {{"west", "room_forest"}, {"east", "room_base"}}, {"npc_healer"}, {"item_herb"}, "推荐：调查河谷的异常管道。"}},
         {"room_cave", Room{"room_cave", "回声山洞", "潮湿的洞壁把每一步脚步声放大，深处隐约传来机械回响。",
-                            {{"north", "room_forest"}, {"east", "room_base"}}, {}, {"item_flint"}, "推荐：仔细观察回声的方向。"}},
-        {"room_base", Room{"room_base", "废弃实验基地", "锈蚀的金属门半掩着，冷光从基地深处的控制台泄出。",
-                            {{"west", "room_river"}, {"north", "room_cave"}}, {}, {"item_chip"}, "推荐：调查入口并留意巡逻机器人。"}}
+                            {{"north", "room_forest"}, {"east", "room_base"}}, {}, {"item_flint", "item_chip"}, "推荐：仔细观察回声的方向。"}},
+        {"room_base", Room{"room_base", "废弃实验基地", "锈蚀的金属门半掩着，冷光从基地深处的控制台泄出。人员撤离后，自动防御系统仍在运行。",
+                            {{"west", "room_river"}, {"north", "room_cave"}}, {}, {}, "推荐：调查入口并留意巡逻机器人。"}}
     };
 }
 
@@ -90,6 +91,10 @@ ActionResult movePlayer(GameContext& context, const std::string& direction) {
     const auto targetRoomIt = context.rooms.find(exitIt->second);
     if (targetRoomIt == context.rooms.end()) {
         return {false, "出口指向未知区域，无法移动。", false, false};
+    }
+
+    if (targetRoomIt->second.getId() == "room_base" && !context.world.hasFlag("flag_base_open")) {
+        return {false, "基地门禁尚未解锁，需要先取得晶片并伪装权限。", false, false};
     }
 
     const bool isFreeShortcut = currentRoomIt->second.getId() == "room_forest" &&
