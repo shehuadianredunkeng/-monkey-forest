@@ -25,7 +25,7 @@ int Player::getSkillLevel(SkillType skill) const {
     return playerStates[this].skills[skill];
 }
 
-std::string Player::getCurrentRoomId() const {
+const std::string& Player::getCurrentRoomId() const {
     return playerStates[this].roomId;
 }
 
