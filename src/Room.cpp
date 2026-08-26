@@ -64,16 +64,16 @@ const std::string& Room::getRecommendedAction() const { return recommendedAction
 std::map<std::string, Room> createAllRooms() {
     return {
         {"room_tree", Room{"room_tree", "猴王树", "巨大的猴王树守望着整片家园，枝叶间传来同伴的呼唤。",
-                            {{"east", "room_forest"}}, {"npc_king", "npc_child"}, {}, "推荐：go east 前往果实森林。"}},
+                            {{"east", "room_forest"}}, {"npc_king", "npc_healer"}, {}, "推荐：先与猴王岩背交谈，再前往果实森林。"}},
         {"room_forest", Room{"room_forest", "果实森林", "成熟果实散发清甜气味，树冠间有一条通往河谷的高处捷径。",
                               {{"west", "room_tree"}, {"east", "room_river"}, {"south", "room_cave"}, {"up", "room_river"}},
                               {"npc_scout"}, {"item_fruit", "item_rope"}, "推荐：look 后收集果实，或继续探索。"}},
         {"room_river", Room{"room_river", "清泉河谷", "河谷的水流被银色管道截断，只剩浅浅的水洼。",
-                             {{"west", "room_forest"}, {"east", "room_base"}}, {"npc_healer"}, {"item_herb"}, "推荐：调查河谷的异常管道。"}},
+                             {{"west", "room_forest"}, {"east", "room_base"}}, {"npc_child"}, {"item_herb"}, "推荐：调查异常管道，并确认豆豆是否安全。"}},
         {"room_cave", Room{"room_cave", "回声山洞", "潮湿的洞壁把每一步脚步声放大，深处隐约传来机械回响。",
                             {{"north", "room_forest"}, {"east", "room_base"}}, {}, {"item_flint", "item_chip"}, "推荐：仔细观察回声的方向。"}},
-        {"room_base", Room{"room_base", "废弃实验基地", "锈蚀的金属门半掩着，冷光从基地深处的控制台泄出。人员撤离后，自动防御系统仍在运行。",
-                            {{"west", "room_river"}, {"north", "room_cave"}}, {}, {}, "推荐：调查入口并留意巡逻机器人。"}}
+        {"room_base", Room{"room_base", "星猿实验基地", "冷光从控制台泄出，工程官赫兹与自动防御系统仍在守护抽取塔。",
+                            {{"west", "room_river"}, {"north", "room_cave"}}, {"npc_hertz"}, {}, "推荐：调查日志，再决定说服赫兹或与其战斗。"}}
     };
 }
 

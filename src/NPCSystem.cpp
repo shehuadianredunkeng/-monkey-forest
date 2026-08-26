@@ -38,11 +38,13 @@ ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
     std::string text;
     if (npcId == "npc_king") {
         if (ctx.world.getStage() <= 2) {
-            text = "岩背：先学会在森林里照顾自己，再谈守护整个猴群。";
+            text = ctx.world.hasFlag("flag_water_fixed")
+                ? "岩背：你让清泉重新流动了。继续追查蓝光，我开始相信你能保护大家。"
+                : "岩背：河谷的水正在消失。先查清蓝光管线，再谈守护整个猴群。";
         } else if (ctx.world.hasFlag("flag_complete_log")) {
             text = npcWillHelp(npcId, ctx)
-                ? "岩背：证据已经足够，我会召集猴群听你指挥。"
-                : "岩背：情报很重要，但大家还没有完全信任你。";
+                ? "岩背：日志证明星猿正在掏空青木谷。我会召集猴群响应你的最终行动。"
+                : "岩背：证据足够，但族群还没有完全信任你。先帮助需要帮助的同伴。";
         } else {
             text = "岩背：河谷和山洞都出现了异常，去查清楚再回来。";
         }
@@ -50,20 +52,36 @@ ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
         if (ctx.world.hasFlag(kScoutQuest)) {
             text = "闪尾：树冠捷径已经清理好，需要时我可以替你引开巡逻机。";
         } else {
-            text = "闪尾：山洞入口有发光脚印。帮我找回藤索，我就带你走捷径。";
+            text = ctx.player.hasItem("item_rope")
+                ? "闪尾盯着你背后的藤索：有它就能横过断崖。把计划交给我吧。"
+                : "闪尾：山洞入口有发光脚印。找到森林里的藤索，我就带你走捷径。";
         }
     } else if (npcId == "npc_healer") {
-        text = ctx.world.hasFlag(kHealerQuest)
-            ? "叶婆婆：草药够用了。受伤时回来，我会替你治疗。"
-            : "叶婆婆：带一株草药回来，我教你制作治疗包。";
+        if (ctx.world.hasFlag(kHealerQuest)) {
+            text = ctx.player.getHealth() < 60
+                ? "叶婆婆：别逞强。战斗时先防御，再找机会使用草药。"
+                : "叶婆婆：你带回的草药救了不少同伴。最终行动时我会照料伤员。";
+        } else {
+            text = ctx.player.hasItem("item_herb")
+                ? "叶婆婆闻到草药香：正是这一株，交给我就能救治伤员。"
+                : "叶婆婆：河谷还长着草药。带一株回来，我会替你疗伤。";
+        }
     } else if (npcId == "npc_child") {
-        text = ctx.world.hasFlag(kChildQuest)
-            ? "豆豆：下次我不会再一个人跑到河边了！"
-            : "豆豆：河谷那边有蓝光，我想去看看……";
+        if (ctx.world.hasFlag(kChildQuest)) {
+            text = "豆豆：下次我不会再一个人跑到河边了！";
+        } else if (ctx.world.hasFlag("flag_child_found")) {
+            text = "豆豆抓住你的手：蓝光机器突然响了，快带我回猴王树！";
+        } else {
+            text = "豆豆：我沿着蓝光脚印跑来，却找不到回家的路了……";
+        }
     } else {
-        text = ctx.world.hasFlag("flag_complete_log")
-            ? "赫兹：你已经读过日志。现在你应该明白，我们只服从能源任务。"
-            : "赫兹：离开这里。青木谷已被列入星猿能源区。";
+        if (!ctx.world.hasFlag("flag_complete_log")) {
+            text = "赫兹挡住控制台：离开。青木谷已被列入星猿能源区。";
+        } else if (npcWillHelp(npcId, ctx)) {
+            text = "赫兹沉默片刻：日志证明总部隐瞒了智慧生命信号。若你能破解护甲，我会听完你的条件。";
+        } else {
+            text = "赫兹：你读过日志又如何？没有足够智慧理解能源核心，就只能靠拳头阻止我。";
+        }
     }
     return {true, text, false, false};
 }
@@ -113,7 +131,7 @@ ActionResult NPCSystem::completeNPCQuest(const std::string& npcId,
             return {false, "闪尾的任务已经完成。", false, false};
         if (!ctx.player.hasItem("item_rope"))
             return {false, "你还没有找到藤索。", false, false};
-        ctx.player.removeItem("item_rope");
+        // 藤索是4号定义的关键物品，任务完成后仍保留在背包中。
         ctx.world.setFlag(kScoutQuest);
         ctx.world.setFlag("flag_scout_help");
         ctx.player.changeReputation(10);
@@ -140,6 +158,8 @@ ActionResult NPCSystem::completeNPCQuest(const std::string& npcId,
         return {true, "你把豆豆安全送回猴群。声望+15。", true, false};
     }
     if (npcId == "npc_king") {
+        if (ctx.world.hasFlag(kKingSupport))
+            return {false, "岩背已经答应支持最终行动。", false, false};
         if (ctx.player.getReputation() < 60)
             return {false, "你的声望还不足以获得猴王支持。", false, false};
         ctx.world.setFlag(kKingSupport);

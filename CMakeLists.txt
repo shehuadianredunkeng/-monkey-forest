@@ -17,6 +17,15 @@ add_library(monkey_player
 )
 target_include_directories(monkey_player PUBLIC include)
 
+add_library(monkey_npc_combat
+    src/Character.cpp
+    src/Enemy.cpp
+    src/NPCSystem.cpp
+    src/CombatSystem.cpp
+)
+target_include_directories(monkey_npc_combat PUBLIC include)
+target_link_libraries(monkey_npc_combat PUBLIC monkey_player)
+
 add_executable(map_tests
     tests/TestMain.cpp
     tests/TestSupport.cpp
@@ -27,13 +36,19 @@ target_link_libraries(map_tests PRIVATE monkey_map)
 add_executable(member4_tests tests/member4_player_test.cpp)
 target_link_libraries(member4_tests PRIVATE monkey_player monkey_map)
 
+add_executable(member3_tests tests/member3_npc_combat_test.cpp)
+target_link_libraries(member3_tests PRIVATE monkey_npc_combat monkey_player monkey_map)
+
 if(MSVC)
     target_compile_options(monkey_map PRIVATE /utf-8)
     target_compile_options(monkey_player PRIVATE /utf-8)
     target_compile_options(map_tests PRIVATE /utf-8)
     target_compile_options(member4_tests PRIVATE /utf-8)
+    target_compile_options(monkey_npc_combat PRIVATE /utf-8)
+    target_compile_options(member3_tests PRIVATE /utf-8)
 endif()
 
 enable_testing()
 add_test(NAME map_tests COMMAND map_tests)
 add_test(NAME member4_tests COMMAND member4_tests)
+add_test(NAME member3_tests COMMAND member3_tests)

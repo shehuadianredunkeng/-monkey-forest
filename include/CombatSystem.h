@@ -28,9 +28,12 @@ public:
 private:
     std::map<std::string, Enemy> enemies_;
     BattleState battleState_;
+    int battleTurn_ = 0;
+    bool enemyArmorActive_ = false;
 
     const Enemy* currentEnemy() const;
     ActionResult enemyCounterAttack(GameContext& ctx, bool guarded);
     ActionResult finishVictory(GameContext& ctx, const Enemy& enemy);
+    int playerAttackDamage(const Enemy& enemy, const GameContext& ctx) const;
     void clearBattle();
 };
