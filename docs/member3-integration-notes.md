@@ -23,12 +23,14 @@
 
 ## 战斗命令
 
+玩家界面统一显示中文命令；为兼容4号主循环，系统同时接受括号中的英文内部命令。
+
 ```text
-attack
-guard
-analyze
-hack
-use item_herb
-use item_fruit
-escape
+攻击（attack）
+防御（guard）
+分析（analyze）
+破解（hack）
+使用 item_herb（use item_herb）
+使用 item_fruit（use item_fruit）
+逃跑（escape）
 ```

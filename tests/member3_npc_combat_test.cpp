@@ -72,8 +72,8 @@ void testRobotHackAndHertzArmor() {
     player.changeWisdom(2);
     expect(combat.startBattle("enemy_robot", ctx).success, "robot battle should start");
     while (combat.isInBattle())
-        expect(combat.performBattleAction("hack", "", ctx).success,
-               "wisdom-three robot hack should work");
+        expect(combat.performBattleAction("破解", "", ctx).success,
+               "Chinese hack command should work");
     expect(world.hasFlag("flag_robot_defeated"), "robot victory flag missing");
 
     player.changeHealth(100);
@@ -82,11 +82,11 @@ void testRobotHackAndHertzArmor() {
     player.changeWisdom(2);
     world.setFlag("flag_complete_log");
     expect(combat.startBattle("enemy_hertz", ctx).success, "Hertz battle should start");
-    expect(combat.performBattleAction("analyze", "", ctx).success,
-           "log and wisdom should disable Hertz armor");
+    expect(combat.performBattleAction("分析", "", ctx).success,
+           "Chinese analyze command should disable Hertz armor");
     while (combat.isInBattle())
-        expect(combat.performBattleAction("attack", "", ctx).success,
-               "attack should finish Hertz battle");
+        expect(combat.performBattleAction("攻击", "", ctx).success,
+               "Chinese attack command should finish Hertz battle");
     expect(world.hasFlag("flag_hertz_defeated"), "Hertz victory flag missing");
 }
 

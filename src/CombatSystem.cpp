@@ -14,6 +14,16 @@ std::string defeatedFlag(const std::string& id) {
     if (id == "enemy_hertz") return "flag_hertz_defeated";
     return "";
 }
+
+std::string normalizeBattleAction(const std::string& action) {
+    if (action == "攻击") return "attack";
+    if (action == "防御") return "guard";
+    if (action == "分析") return "analyze";
+    if (action == "破解") return "hack";
+    if (action == "使用") return "use";
+    if (action == "逃跑" || action == "撤退") return "escape";
+    return action;
+}
 }
 
 void CombatSystem::initializeEnemies() {
@@ -48,11 +58,11 @@ ActionResult CombatSystem::startBattle(const std::string& enemyId,
     enemyArmorActive_ = enemyId == "enemy_hertz";
     std::string hint;
     if (enemyId == "enemy_bees")
-        hint = "蜂群怕稳固防守，guard可以打乱它们。";
+        hint = "蜂群怕稳固防守，选择“防御”可以打乱它们。";
     else if (enemyId == "enemy_robot")
-        hint = "巡逻机每第三回合会蓄力射击；智慧足够可尝试hack。";
+        hint = "巡逻机每第三回合会蓄力射击；智慧足够时可以尝试“破解”。";
     else
-        hint = "能源护甲会削弱攻击；读过日志后可用analyze或hack。";
+        hint = "能源护甲会削弱攻击；读过日志后可以尝试“分析”或“破解”。";
     return {true, "战斗开始：" + it->second.getName() + "，敌方生命" +
                   std::to_string(battleState_.enemyHealth) + "。" + hint,
             false, false};
@@ -78,7 +88,9 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
         return {false, "战斗数据异常，战斗已结束。", false, false};
     }
 
-    if (action == "attack") {
+    const std::string command = normalizeBattleAction(action);
+
+    if (command == "attack") {
         ++battleTurn_;
         const int damage = playerAttackDamage(*enemy, ctx);
         battleState_.enemyHealth = std::max(0, battleState_.enemyHealth - damage);
@@ -88,7 +100,7 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
             (enemyArmorActive_ ? "能源护甲吸收了大部分冲击。" : "") + result.message;
         return result;
     }
-    if (action == "guard") {
+    if (command == "guard") {
         ++battleTurn_;
         battleState_.playerGuarding = true;
         if (battleState_.enemyId == "enemy_bees") {
@@ -99,7 +111,7 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
         result.message = "你稳住重心摆出防御姿态。" + result.message;
         return result;
     }
-    if (action == "analyze") {
+    if (command == "analyze") {
         if (battleState_.enemyId != "enemy_hertz")
             return {false, "这个敌人没有能源护甲可分析。", false, false};
         if (!ctx.world.hasFlag("flag_complete_log") || ctx.player.getWisdom() < 3)
@@ -112,7 +124,7 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
         result.message = "你根据日志切断护甲供能。" + result.message;
         return result;
     }
-    if (action == "hack") {
+    if (command == "hack") {
         int damage = 0;
         if (battleState_.enemyId == "enemy_robot" && ctx.player.getWisdom() >= 3)
             damage = 12;
@@ -130,7 +142,7 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
         result.message = "破解成功，造成" + std::to_string(damage) + "点伤害。" + result.message;
         return result;
     }
-    if (action == "use") {
+    if (command == "use") {
         if (target.empty()) return {false, "请输入要使用的物品ID。", false, false};
         ActionResult used = useItem(target, ctx);
         if (!used.success) return used;
@@ -139,14 +151,14 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
         result.message = used.message + result.message;
         return result;
     }
-    if (action == "escape") {
+    if (command == "escape") {
         if (battleState_.enemyId == "enemy_hertz" &&
             !ctx.world.hasFlag("flag_scout_help"))
             return {false, "赫兹封锁了出口；没有闪尾掩护，暂时无法撤退。", false, false};
         clearBattle();
         return {true, "闪尾制造声响，你趁乱成功脱离战斗。", true, false};
     }
-    return {false, "未知战斗命令，可使用attack、guard、analyze、hack、use或escape。",
+    return {false, "无法识别这个战斗指令。你可以选择：攻击、防御、分析、破解、使用物品或逃跑。",
             false, false};
 }
 
