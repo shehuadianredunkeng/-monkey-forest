@@ -21,6 +21,25 @@ std::string joinIds(const std::vector<std::string>& ids) {
     return output.str();
 }
 
+std::string npcDisplayName(const std::string& id) {
+    if (id == "npc_king") return "岩背";
+    if (id == "npc_scout") return "闪尾";
+    if (id == "npc_healer") return "叶婆婆";
+    if (id == "npc_child") return "豆豆";
+    if (id == "npc_hertz") return "赫兹";
+    return id;
+}
+
+std::string describeNPCs(const std::vector<std::string>& ids) {
+    if (ids.empty()) return "无";
+    std::ostringstream output;
+    for (std::size_t index = 0; index < ids.size(); ++index) {
+        if (index > 0) output << "、";
+        output << npcDisplayName(ids[index]);
+    }
+    return output.str();
+}
+
 std::string describeExits(const std::map<std::string, std::string>& exits,
                           const std::map<std::string, Room>& rooms) {
     std::ostringstream output;
@@ -125,7 +144,7 @@ std::string lookAround(const GameContext& context) {
     output << "【" << room.getName() << "】\n";
     output << room.getBaseDescription() << "\n";
     output << "出口：" << describeExits(room.getExits(), context.rooms) << "\n";
-    output << "NPC：" << joinIds(room.getNPCIds()) << "\n";
+    output << "NPC：" << describeNPCs(room.getNPCIds()) << "\n";
     output << "物品：" << joinIds(room.getItemIds()) << "\n";
     output << room.getRecommendedAction();
     return output.str();

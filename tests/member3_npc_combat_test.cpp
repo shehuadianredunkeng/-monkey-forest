@@ -45,7 +45,7 @@ void testNpcTasksUsePlayerAndWorldInterfaces() {
     npcs.initializeNPCs();
 
     expect(npcs.talkToNPC("闪尾", ctx).success, "Chinese NPC alias should work");
-    expect(npcs.talkToNPC("scout", ctx).message.find("1.") != std::string::npos,
+    expect(npcs.talkToNPC("闪尾", ctx).message.find("1.") != std::string::npos,
            "second scout talk should show choices");
     expect(npcs.chooseNPCDialogue("闪尾", 2, ctx).success,
            "scout dialogue choice should work");
@@ -83,6 +83,12 @@ void testNpcTasksUsePlayerAndWorldInterfaces() {
     expect(help.find("quest") == std::string::npos &&
                help.find("finish") == std::string::npos,
            "player help must not expose quest or finish commands");
+
+    player.setCurrentRoomId("room_forest");
+    const std::string roomText = lookAround(ctx);
+    expect(roomText.find("闪尾") != std::string::npos &&
+               roomText.find("npc_scout") == std::string::npos,
+           "room should show NPC name instead of internal id");
 }
 
 void testTheftAndBeeDefenseAchievements() {
