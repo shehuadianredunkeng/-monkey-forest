@@ -22,6 +22,7 @@ std::string normalizeBattleAction(const std::string& action) {
     if (action == "破解") return "hack";
     if (action == "使用") return "use";
     if (action == "逃跑" || action == "撤退") return "escape";
+    if (action == "香蕉" || action == "巴拿拿") return "banana";
     return action;
 }
 }
@@ -53,7 +54,7 @@ ActionResult CombatSystem::startBattle(const std::string& enemyId,
     if (!flag.empty() && ctx.world.hasFlag(flag))
         return {false, "这个敌人已经被击败，不会重复出现。", false, false};
 
-    battleState_ = {true, enemyId, it->second.getMaxHealth(), false};
+    battleState_ = {true, enemyId, it->second.getMaxHealth(), false, false, false};
     battleTurn_ = 0;
     enemyArmorActive_ = enemyId == "enemy_hertz";
     std::string hint;
@@ -61,7 +62,14 @@ ActionResult CombatSystem::startBattle(const std::string& enemyId,
         hint = "蜂群怕稳固防守，选择“防御”可以打乱它们。";
     else if (enemyId == "enemy_robot")
         hint = "巡逻机每第三回合会蓄力射击；智慧足够时可以尝试“破解”。";
-    else
+    else if (ctx.world.hasFlag("flag_scout_banana_promise")) {
+        battleState_.awaitingBananaChoice = true;
+        hint = "赫兹忽然递来一根巴拿拿。\n"
+               "1. 把巴拿拿给闪尾\n"
+               "2. 把巴拿拿吃了\n"
+               "3. 拒绝香蕉【需要智慧≥3】\n"
+               "请输入：香蕉 1/2/3（banana 1/2/3）。";
+    } else
         hint = "能源护甲会削弱攻击；读过日志后可以尝试“分析”或“破解”。";
     return {true, "战斗开始：" + it->second.getName() + "，敌方生命" +
                   std::to_string(battleState_.enemyHealth) + "。" + hint,
@@ -89,6 +97,13 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
     }
 
     const std::string command = normalizeBattleAction(action);
+
+    if (battleState_.awaitingBananaChoice || battleState_.bananaGreedLoop) {
+        if (command != "banana")
+            return {false, "赫兹正举着巴拿拿等你选择。请输入“香蕉 1/2/3（banana 1/2/3）”。",
+                    false, false};
+        return handleBananaChoice(target, ctx);
+    }
 
     if (command == "attack") {
         ++battleTurn_;
@@ -152,14 +167,76 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
         return result;
     }
     if (command == "escape") {
-        if (battleState_.enemyId == "enemy_hertz" &&
-            !ctx.world.hasFlag("flag_scout_help"))
-            return {false, "赫兹封锁了出口；没有闪尾掩护，暂时无法撤退。", false, false};
+        if (!ctx.world.hasFlag("flag_skill_escape_unlocked"))
+            return {false, "你还没有解锁“逃跑”。完成闪尾的藤蔓任务后再试。", false, false};
         clearBattle();
-        return {true, "闪尾制造声响，你趁乱成功脱离战斗。", true, false};
+        return {true, "闪尾从天而降，抓起你就荡着藤蔓跑了。", true, false};
     }
     return {false, "无法识别这个战斗指令。你可以选择：攻击、防御、分析、破解、使用物品或逃跑。",
             false, false};
+}
+
+ActionResult CombatSystem::handleBananaChoice(const std::string& target,
+                                              GameContext& ctx) {
+    if (target != "1" && target != "2" && target != "3")
+        return {false, "请选择 1、2 或 3。", false, false};
+
+    if (battleState_.bananaGreedLoop) {
+        if (target == "2") {
+            ctx.player.changeHealth(-ctx.player.getHealth());
+            ctx.world.setFlag("flag_bad_ending_second_banana");
+            clearBattle();
+            return {false,
+                    "你嘴上说着不吃了，手却再次伸向巴拿拿。\n"
+                    "坏结局：有了第一次就有第二次！",
+                    true, true};
+        }
+        if (target == "3")
+            return {false, "诱惑已经控制了你。现在只能选择“继续吃”或“不吃了”。",
+                    false, false};
+
+        ++battleTurn_;
+        ActionResult hit = enemyCounterAttack(ctx, false);
+        if (ctx.player.getHealth() <= 0) {
+            ctx.world.setFlag("flag_bad_ending_gluttony");
+            return {false,
+                    "赫兹不断递来巴拿拿，而你只知道一根接一根地吃。\n"
+                    "坏结局：你犯下了暴食罪！",
+                    true, true};
+        }
+        hit.message = "你接过巴拿拿继续吃，赫兹趁机发动攻击。" + hit.message +
+                      "\n1. 继续吃　2. 不吃了";
+        return hit;
+    }
+
+    if (target == "1") {
+        battleState_.awaitingBananaChoice = false;
+        ctx.world.setFlag("flag_banana_given_to_scout");
+        return {true,
+                "你把巴拿拿抛给闪尾。闪尾一口接住：讲究！这边交给哥！\n"
+                "香蕉诱惑已解除，可以继续战斗。",
+                true, false};
+    }
+    if (target == "3") {
+        if (ctx.player.getWisdom() < 3)
+            return {false, "香味让你挪不开眼。拒绝香蕉需要智慧≥3。", false, false};
+        battleState_.awaitingBananaChoice = false;
+        ctx.world.setFlag("flag_banana_refused");
+        return {true, "你识破了诱惑，果断拒绝巴拿拿。可以继续战斗。", true, false};
+    }
+
+    battleState_.awaitingBananaChoice = false;
+    battleState_.bananaGreedLoop = true;
+    ++battleTurn_;
+    ActionResult hit = enemyCounterAttack(ctx, false);
+    if (ctx.player.getHealth() <= 0) {
+        ctx.world.setFlag("flag_bad_ending_gluttony");
+        return {false, "你沉迷巴拿拿，直到倒在赫兹面前。\n坏结局：你犯下了暴食罪！",
+                true, true};
+    }
+    hit.message = "你咬下一大口巴拿拿，注意力完全被香甜味道占据。" + hit.message +
+                  "\n赫兹又递来一根：1. 继续吃　2. 不吃了";
+    return hit;
 }
 
 ActionResult CombatSystem::enemyCounterAttack(GameContext& ctx, bool guarded) {

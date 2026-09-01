@@ -11,6 +11,8 @@ struct BattleState {
     std::string enemyId;
     int enemyHealth = 0;
     bool playerGuarding = false;
+    bool awaitingBananaChoice = false;
+    bool bananaGreedLoop = false;
 };
 
 class CombatSystem {
@@ -34,6 +36,8 @@ private:
     const Enemy* currentEnemy() const;
     ActionResult enemyCounterAttack(GameContext& ctx, bool guarded);
     ActionResult finishVictory(GameContext& ctx, const Enemy& enemy);
+    ActionResult handleBananaChoice(const std::string& target,
+                                    GameContext& ctx);
     int playerAttackDamage(const Enemy& enemy, const GameContext& ctx) const;
     void clearBattle();
 };

@@ -132,6 +132,17 @@ std::string lookAround(const GameContext& context) {
 }
 
 std::string getCommandHelp() {
-    return "可用命令：look 查看场景；go <direction> 移动；talk <npc_id> 与 NPC 对话；"
-           "take <item_id> 拾取物品；status 查看状态；help 查看帮助。";
+    return "===== 帮助（help）=====\n"
+           "查看（look）：查看当前场景\n"
+           "移动（go）<方向>：前往相邻地点\n"
+           "对话（talk）[角色] [选项]：与角色交谈；只有一名角色时可省略名称\n"
+           "任务（quest）[角色]：查看角色任务\n"
+           "完成（finish）[角色]：交付并完成任务\n"
+           "拾取（take）[物品]：拾取物品，可使用中文名或短名称\n"
+           "状态（status）：查看玩家状态\n"
+           "背包（inventory）：查看随身物品\n"
+           "攻击（attack）/防御（guard）/分析（analyze）/破解（hack）：战斗动作\n"
+           "逃跑（escape）：完成闪尾任务后解锁\n"
+           "香蕉（banana）<1/2/3>：回应赫兹的香蕉诱惑\n"
+           "帮助（help）：再次显示本页";
 }
