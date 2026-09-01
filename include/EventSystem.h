@@ -18,6 +18,9 @@ public:
     ActionResult chooseEventOption(const std::string& eventId,
                                    int option,
                                    GameContext& ctx);
+    ActionResult triggerAvailableMainEvent(GameContext& ctx);
+    ActionResult resumePendingEventAfterBattle(GameContext& ctx);
+    std::string getCurrentObjective(const GameContext& ctx) const;
     std::string getStageIntroduction(int stage) const;
     std::string getEndingText(const std::string& endingId) const;
 
@@ -29,7 +32,8 @@ private:
     std::string findPendingEventId(const WorldState& world) const;
     bool hasOtherPendingEvent(const Event& event,
                               const WorldState& world) const;
-    int countCompletedRandomEvents(const WorldState& world) const;
+    const Event* findRecommendedMainEvent(const GameContext& ctx,
+                                          bool requireCurrentRoom) const;
     const Event* chooseRandomEvent(const GameContext& ctx) const;
     ActionResult resolveChoice(const Event& event,
                                int option,
