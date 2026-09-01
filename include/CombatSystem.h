@@ -13,6 +13,10 @@ struct BattleState {
     bool playerGuarding = false;
     bool awaitingBananaChoice = false;
     bool bananaGreedLoop = false;
+    bool theftUsed = false;
+    bool fireUsed = false;
+    int consecutiveGuards = 0;
+    int doubleDamageTurns = 0;
 };
 
 class CombatSystem {
@@ -38,6 +42,9 @@ private:
     ActionResult finishVictory(GameContext& ctx, const Enemy& enemy);
     ActionResult handleBananaChoice(const std::string& target,
                                     GameContext& ctx);
+    ActionResult handleTheft(GameContext& ctx);
+    ActionResult handleFlintAttack(GameContext& ctx);
+    void recordTheftAchievement(GameContext& ctx);
     int playerAttackDamage(const Enemy& enemy, const GameContext& ctx) const;
     void clearBattle();
 };

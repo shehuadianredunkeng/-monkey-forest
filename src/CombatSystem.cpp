@@ -2,9 +2,12 @@
 
 #include "Player.h"
 #include "PlayerActions.h"
+#include "Item.h"
 #include "WorldState.h"
 
 #include <algorithm>
+#include <random>
+#include <sstream>
 #include <string>
 
 namespace {
@@ -23,7 +26,25 @@ std::string normalizeBattleAction(const std::string& action) {
     if (action == "使用") return "use";
     if (action == "逃跑" || action == "撤退") return "escape";
     if (action == "香蕉" || action == "巴拿拿") return "banana";
+    if (action == "偷窃" || action == "顺手牵羊" || action == "偷") return "steal";
+    if (action == "背包") return "inventory";
     return action;
+}
+
+int randomPercent() {
+    static thread_local std::mt19937 generator(std::random_device{}());
+    return std::uniform_int_distribution<int>(1, 100)(generator);
+}
+
+std::string randomScoutFollowUp() {
+    static const char* verbs[] = {"挠", "抠", "扁", "拍"};
+    static const char* parts[] = {"屁股", "脑瓜子", "后腰", "脚后跟"};
+    static thread_local std::mt19937 generator(std::random_device{}());
+    std::uniform_int_distribution<int> verb(0, 3);
+    std::uniform_int_distribution<int> part(0, 3);
+    if (randomPercent() <= 20) return "闪尾趁乱冲对方扔了一块香蕉皮，追击造成3点伤害。";
+    return "闪尾趁乱" + std::string(verbs[verb(generator)]) + "了对方的" +
+           parts[part(generator)] + "，追击造成3点伤害。";
 }
 }
 
@@ -54,7 +75,10 @@ ActionResult CombatSystem::startBattle(const std::string& enemyId,
     if (!flag.empty() && ctx.world.hasFlag(flag))
         return {false, "这个敌人已经被击败，不会重复出现。", false, false};
 
-    battleState_ = {true, enemyId, it->second.getMaxHealth(), false, false, false};
+    battleState_ = BattleState{};
+    battleState_.inBattle = true;
+    battleState_.enemyId = enemyId;
+    battleState_.enemyHealth = it->second.getMaxHealth();
     battleTurn_ = 0;
     enemyArmorActive_ = enemyId == "enemy_hertz";
     std::string hint;
@@ -71,8 +95,22 @@ ActionResult CombatSystem::startBattle(const std::string& enemyId,
                "请输入：香蕉 1/2/3（banana 1/2/3）。";
     } else
         hint = "能源护甲会削弱攻击；读过日志后可以尝试“分析”或“破解”。";
+    std::string tutorial;
+    if (!ctx.world.hasFlag("flag_combat_tutorial_seen")) {
+        ctx.world.setFlag("flag_combat_tutorial_seen");
+        tutorial = "\n【首次战斗教学】攻击（attack）造成伤害；防御（guard）降低伤害；"
+                   "偷窃（steal）每场限一次；背包（inventory）查看物品；"
+                   "完成闪尾任务后可使用逃跑（escape）。特殊战斗会另行显示分析、破解等选项。\n";
+    }
+    const std::string flintWarning = ctx.player.hasItem("item_flint")
+        ? "\n提示：你带着燧石，可输入“使用 燧石（use flint）”发动火攻；有较高风险，建议先存档。"
+        : "";
+    const std::string hertzLine = enemyId == "enemy_hertz"
+        ? "\n赫兹：你们把守护叫作勇气，我把开发叫作进步。让我看看谁能站到最后。"
+        : "";
     return {true, "战斗开始：" + it->second.getName() + "，敌方生命" +
-                  std::to_string(battleState_.enemyHealth) + "。" + hint,
+                  std::to_string(battleState_.enemyHealth) + "。" + tutorial + hint +
+                  flintWarning + hertzLine,
             false, false};
 }
 
@@ -107,24 +145,64 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
 
     if (command == "attack") {
         ++battleTurn_;
-        const int damage = playerAttackDamage(*enemy, ctx);
+        int damage = playerAttackDamage(*enemy, ctx);
+        std::string blessing;
+        if (battleState_.doubleDamageTurns > 0) {
+            damage *= 2;
+            --battleState_.doubleDamageTurns;
+            blessing = "豆豆的神秘祝福让本次攻击伤害翻倍！";
+        }
         battleState_.enemyHealth = std::max(0, battleState_.enemyHealth - damage);
         if (battleState_.enemyHealth == 0) return finishVictory(ctx, *enemy);
+        std::string followUp;
+        if (ctx.world.hasFlag("flag_scout_help") && randomPercent() <= 35) {
+            battleState_.enemyHealth = std::max(0, battleState_.enemyHealth - 3);
+            followUp = randomScoutFollowUp();
+            if (battleState_.enemyHealth == 0) {
+                ActionResult victory = finishVictory(ctx, *enemy);
+                victory.message = blessing + "你造成" + std::to_string(damage) + "点伤害。" +
+                                  followUp + victory.message;
+                return victory;
+            }
+        }
         ActionResult result = enemyCounterAttack(ctx, false);
-        result.message = "你造成" + std::to_string(damage) + "点伤害。" +
+        result.message = blessing + "你造成" + std::to_string(damage) + "点伤害。" + followUp +
             (enemyArmorActive_ ? "能源护甲吸收了大部分冲击。" : "") + result.message;
         return result;
     }
     if (command == "guard") {
         ++battleTurn_;
         battleState_.playerGuarding = true;
+        std::string guardText;
         if (battleState_.enemyId == "enemy_bees") {
-            battleState_.enemyHealth = std::max(0, battleState_.enemyHealth - 2);
+            ++battleState_.consecutiveGuards;
+            int counterDamage = 0;
+            if (battleState_.consecutiveGuards == 1) {
+                counterDamage = 6;
+                guardText = "蜂群没料到你居然就地抱头，顿时乱了阵型。";
+            } else if (battleState_.consecutiveGuards == 2) {
+                counterDamage = 3;
+                guardText = "蜂群逐渐找到了攻击你的方式，但你灵活走位，仍让它们撞作一团。";
+            } else {
+                ctx.world.setFlag("flag_achievement_you_fight_back");
+                guardText = "蜂群已经看穿你的套路。隐藏成就解锁：你倒是还手啊！";
+            }
+            battleState_.enemyHealth = std::max(0, battleState_.enemyHealth - counterDamage);
             if (battleState_.enemyHealth == 0) return finishVictory(ctx, *enemy);
+        } else {
+            battleState_.consecutiveGuards = 0;
         }
-        ActionResult result = enemyCounterAttack(ctx, true);
-        result.message = "你稳住重心摆出防御姿态。" + result.message;
+        const bool guardWorks = battleState_.enemyId != "enemy_bees" ||
+                                battleState_.consecutiveGuards <= 2;
+        ActionResult result = enemyCounterAttack(ctx, guardWorks);
+        result.message = "你稳住重心摆出防御姿态。" + guardText + result.message;
         return result;
+    }
+    if (command == "steal") return handleTheft(ctx);
+    if (command == "inventory") {
+        return {true, showInventory(ctx.player) +
+                      "\n战斗中可输入“使用 物品（use item）”。燧石可发动火攻。",
+                false, false};
     }
     if (command == "analyze") {
         if (battleState_.enemyId != "enemy_hertz")
@@ -158,7 +236,9 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
         return result;
     }
     if (command == "use") {
-        if (target.empty()) return {false, "请输入要使用的物品ID。", false, false};
+        if (target.empty()) return {false, "请输入要使用的物品名称。", false, false};
+        if (target == "item_flint" || target == "flint" || target == "燧石")
+            return handleFlintAttack(ctx);
         ActionResult used = useItem(target, ctx);
         if (!used.success) return used;
         ++battleTurn_;
@@ -174,6 +254,72 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
     }
     return {false, "无法识别这个战斗指令。你可以选择：攻击、防御、分析、破解、使用物品或逃跑。",
             false, false};
+}
+
+void CombatSystem::recordTheftAchievement(GameContext& ctx) {
+    if (!ctx.world.hasFlag("flag_theft_streak_1")) {
+        ctx.world.setFlag("flag_theft_streak_1");
+    } else if (!ctx.world.hasFlag("flag_theft_streak_2")) {
+        ctx.world.setFlag("flag_theft_streak_2");
+    } else {
+        ctx.world.setFlag("flag_achievement_monkey_borrow");
+    }
+}
+
+ActionResult CombatSystem::handleTheft(GameContext& ctx) {
+    const Enemy* enemy = currentEnemy();
+    if (!enemy) return {false, "当前没有可以偷窃的目标。", false, false};
+    if (battleState_.theftUsed)
+        return {false, "多次偷窃使你良心不安，错失了良机。", false, false};
+    battleState_.theftUsed = true;
+    recordTheftAchievement(ctx);
+
+    std::string reward;
+    if (battleState_.enemyId == "enemy_bees") {
+        ctx.player.addItem(Item("item_honey", "蜂蜜"));
+        ctx.player.changeHealth(12);
+        reward = "你从蜂巢边顺走一小罐蜂蜜，生命+12，并获得蜂蜜。";
+    } else if (battleState_.enemyId == "enemy_robot") {
+        ctx.player.addItem(Item("item_material_fragment", "材料碎片"));
+        ctx.player.changeStrength(1);
+        reward = "你拆下一块材料碎片，力量+1，并获得材料碎片。";
+    } else {
+        ctx.player.addItem(Item("item_book", "星猿研究手册"));
+        ctx.player.changeWisdom(1);
+        reward = "你顺走赫兹的研究手册，智慧+1，并获得星猿研究手册。";
+    }
+    if (ctx.world.hasFlag("flag_achievement_monkey_borrow"))
+        reward += "隐藏成就解锁：吗喽的事怎么能叫偷呢！";
+
+    ++battleTurn_;
+    ActionResult result = enemyCounterAttack(ctx, false);
+    result.message = reward + result.message;
+    return result;
+}
+
+ActionResult CombatSystem::handleFlintAttack(GameContext& ctx) {
+    if (!ctx.player.hasItem("item_flint"))
+        return {false, "背包中没有燧石。", false, false};
+    if (battleState_.fireUsed)
+        return {false, "周围已经火星四溅，不能再次使用燧石。", false, false};
+    battleState_.fireUsed = true;
+    ++battleTurn_;
+    if (randomPercent() <= 50) {
+        ctx.player.changeHealth(-ctx.player.getHealth());
+        ctx.world.setFlag("flag_bad_ending_forest_fire");
+        clearBattle();
+        return {false,
+                "火星落进枯叶，风把火舌卷向整片青木谷。\n"
+                "坏结局：放火烧山。",
+                true, true};
+    }
+    const Enemy* enemy = currentEnemy();
+    if (!enemy) return {false, "敌人数据不存在。", false, false};
+    battleState_.enemyHealth = std::max(0, battleState_.enemyHealth - 20);
+    if (battleState_.enemyHealth == 0) return finishVictory(ctx, *enemy);
+    ActionResult result = enemyCounterAttack(ctx, false);
+    result.message = "你用燧石发动火攻，造成20点伤害！" + result.message;
+    return result;
 }
 
 ActionResult CombatSystem::handleBananaChoice(const std::string& target,
@@ -242,6 +388,25 @@ ActionResult CombatSystem::handleBananaChoice(const std::string& target,
 ActionResult CombatSystem::enemyCounterAttack(GameContext& ctx, bool guarded) {
     const Enemy* enemy = currentEnemy();
     if (!enemy) return {false, "敌人数据不存在。", false, false};
+    std::string blessing;
+    // 选择沉迷香蕉后必须完整承担该路线后果，豆豆祝福不在此路线中打断结局。
+    if (ctx.world.hasFlag("flag_child_rescued") && !battleState_.bananaGreedLoop) {
+        const int roll = randomPercent();
+        if (roll == 1) {
+            ctx.world.setFlag("flag_achievement_doudou_bond");
+            ActionResult victory = finishVictory(ctx, *enemy);
+            victory.message = "豆豆的神秘祝福化作一道金光，直接击败了对手！"
+                              "隐藏成就解锁：不要小瞧你与豆豆的羁绊啊！" + victory.message;
+            return victory;
+        }
+        if (roll <= 6) {
+            battleState_.doubleDamageTurns = 3;
+            blessing = "豆豆的神秘祝福生效：接下来三次攻击伤害翻倍。";
+        } else if (roll <= 26) {
+            ctx.player.changeHealth(8);
+            blessing = "豆豆的神秘祝福为你恢复8点生命。";
+        }
+    }
     int attack = enemy->getAttack();
     std::string move = "敌人反击";
     if (battleState_.enemyId == "enemy_robot" && battleTurn_ % 3 == 0) {
@@ -265,7 +430,7 @@ ActionResult CombatSystem::enemyCounterAttack(GameContext& ctx, bool guarded) {
     }
     const std::string heal = ctx.world.hasFlag("flag_healer_supplied")
         ? "叶婆婆的草药让你恢复2点生命。" : "";
-    return {true, move + "造成" + std::to_string(damage) +
+    return {true, blessing + move + "造成" + std::to_string(damage) +
                   "点伤害；敌方剩余生命" +
                   std::to_string(battleState_.enemyHealth) + "。" + heal,
             true, false};

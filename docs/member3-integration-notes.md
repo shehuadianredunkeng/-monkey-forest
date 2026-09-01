@@ -7,6 +7,11 @@
 - `attack`、`guard`、`use`、`escape`基础行动，以及`analyze`、`hack`扩展行动。
 - 闪尾任务包含两条对话路线，交付藤蔓后解锁“逃跑（escape）”。
 - 若玩家向闪尾承诺香蕉，赫兹战会出现香蕉诱惑、智慧判定与两个坏结局。
+- 基础战斗动作精简为攻击、防御、偷窃、背包和逃跑；分析、破解等只在特殊战斗提示。
+- 每场战斗限偷窃一次：蜂群掉落蜂蜜、巡逻机掉落材料碎片、赫兹掉落研究手册。
+- 蜂群连续防御采用递减收益，第三次不再反伤并触发成就标记。
+- 救回豆豆后，战斗回合可能触发回血、三次攻击翻倍或直接击败敌人的祝福。
+- 燧石可在战斗中发动20点火攻，但可能触发“放火烧山”坏结局。
 - 闪尾减伤、叶婆婆战中恢复、猴王增伤三种NPC协助效果。
 - 赫兹能源护甲、巡逻机每三回合蓄力、野蜂防御反制等差异机制。
 
@@ -24,7 +29,11 @@
 - 2号产生：`flag_water_fixed`、`flag_child_found`、`flag_complete_log`。
 - 3号产生：`flag_scout_help`、`flag_skill_escape_unlocked`、`flag_scout_banana_promise`、
   `flag_bad_ending_second_banana`、`flag_bad_ending_gluttony`、`flag_healer_supplied`、
-  `flag_child_rescued`、`flag_king_support`、三种敌人击败旗标。
+  `flag_child_rescued`、`flag_king_support`、三种敌人击败旗标，以及以下成就标记：
+  `flag_achievement_monkey_borrow`、`flag_achievement_you_fight_back`、
+  `flag_achievement_doudou_bond`、`flag_achievement_no_rice`。
+- 5号负责把这些成就标记永久保存到独立成就文件；不要与普通存档一起覆盖。
+- `random`次数限制属于2号`EventSystem`，3号分支不直接修改该模块。
 - 5号需要按纯接口实现完整`WorldState`；3号测试中的状态实现仅用于独立测试。
 
 ## 战斗命令
@@ -34,10 +43,13 @@
 ```text
 攻击（attack）
 防御（guard）
+偷窃（steal，每场限一次）
+背包（inventory）
 分析（analyze）
 破解（hack）
 使用 item_herb（use item_herb）
 使用 item_fruit（use item_fruit）
+使用 燧石（use flint）
 逃跑（escape）
 香蕉 1/2/3（banana 1/2/3，仅赫兹诱惑阶段）
 ```

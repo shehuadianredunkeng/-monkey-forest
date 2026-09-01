@@ -63,9 +63,53 @@ void testNpcTasksUsePlayerAndWorldInterfaces() {
     expect(healer.success && player.getHealth() == 95, "healer quest result mismatch");
     expect(!player.hasItem("item_herb"), "ordinary herb should be consumed");
 
-    world.setFlag("flag_child_found");
-    expect(npcs.completeNPCQuest("npc_child", ctx).success,
-           "child rescue should complete after event flag");
+    expect(npcs.talkToNPC("豆豆", ctx).success,
+           "talking to child should find the injured child");
+    expect(!npcs.chooseNPCDialogue("豆豆", 2, ctx).success,
+           "child treatment must require herb");
+    expect(world.hasFlag("flag_achievement_no_rice"),
+           "missing-herb achievement flag missing");
+    expect(player.addItem(Item("item_herb", "草药")), "second herb setup failed");
+    expect(npcs.chooseNPCDialogue("豆豆", 2, ctx).success,
+           "child rescue should complete through dialogue");
+    expect(world.hasFlag("flag_child_rescued"), "child rescue flag missing");
+}
+
+void testTheftAndBeeDefenseAchievements() {
+    Player player;
+    WorldState world;
+    auto rooms = createAllRooms();
+    GameContext ctx{player, world, rooms};
+
+    CombatSystem bees;
+    expect(bees.startBattle("enemy_bees", ctx).success, "bees should start");
+    expect(bees.performBattleAction("偷窃", "", ctx).success,
+           "Chinese steal command should work");
+    expect(player.hasItem("item_honey"), "bees should yield honey");
+    expect(!bees.performBattleAction("偷窃", "", ctx).success,
+           "theft should be limited to once per battle");
+    expect(bees.performBattleAction("防御", "", ctx).success, "first guard failed");
+    expect(bees.performBattleAction("防御", "", ctx).success, "second guard failed");
+    expect(bees.performBattleAction("防御", "", ctx).success, "third guard failed");
+    expect(world.hasFlag("flag_achievement_you_fight_back"),
+           "three-guard achievement missing");
+    while (bees.isInBattle())
+        expect(bees.performBattleAction("攻击", "", ctx).success, "bees cleanup failed");
+
+    player.changeHealth(100);
+    CombatSystem robot;
+    expect(robot.startBattle("enemy_robot", ctx).success, "robot should start");
+    expect(robot.performBattleAction("steal", "", ctx).success, "robot theft failed");
+    expect(player.hasItem("item_material_fragment"), "robot material missing");
+    world.setFlag("flag_robot_defeated");
+
+    player.changeHealth(100);
+    CombatSystem hertz;
+    expect(hertz.startBattle("enemy_hertz", ctx).success, "Hertz should start");
+    expect(hertz.performBattleAction("偷", "", ctx).success, "Hertz theft failed");
+    expect(player.hasItem("item_book"), "Hertz book missing");
+    expect(world.hasFlag("flag_achievement_monkey_borrow"),
+           "three-theft achievement missing");
 }
 
 void testEscapeSkillAndHertzBananaChoice() {
@@ -152,6 +196,7 @@ void testNpcPlacementMatchesQuestFlow() {
 int main() {
     try {
         testNpcTasksUsePlayerAndWorldInterfaces();
+        testTheftAndBeeDefenseAchievements();
         testRobotHackAndHertzArmor();
         testEscapeSkillAndHertzBananaChoice();
         testHertzBananaBadEndings();

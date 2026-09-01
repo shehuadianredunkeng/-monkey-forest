@@ -84,12 +84,19 @@ ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
                 : "叶婆婆：河谷还长着草药。带一株回来，我会替你疗伤。";
         }
     } else if (id == "npc_child") {
-        if (ctx.world.hasFlag(kChildQuest))
+        if (ctx.world.hasFlag(kChildQuest)) {
             text = "豆豆：谢谢你带我回来！我会乖乖留在猴王树。";
-        else if (ctx.world.hasFlag("flag_child_found"))
-            text = "豆豆抓住你的手：蓝光机器突然响了，快带我回猴王树！";
-        else
-            text = "豆豆：我沿着蓝光脚印跑来，却找不到回家的路了……";
+        } else if (!ctx.world.hasFlag("flag_child_found")) {
+            ctx.world.setFlag("flag_child_found");
+            text = "你在河谷边找到了豆豆。她的腿被划伤，正强忍着眼泪。\n"
+                   "豆豆：我走不动了……你能帮帮我吗？再次与豆豆对话查看办法。";
+        } else {
+            text = "豆豆的伤口还在流血，你准备怎么做？\n"
+                   "1. 找叶婆婆前来救治【需要草药】\n"
+                   "2. 给豆豆疗伤后将她带回猴王树【需要草药】\n"
+                   "3. 暂时离开，寻找草药\n"
+                   "请输入：对话 豆豆 1/2/3（talk child 1/2/3）。";
+        }
     } else {
         if (!ctx.world.hasFlag("flag_complete_log"))
             text = "赫兹挡住控制台：离开。青木谷已被列入星猿能源区。";
@@ -106,6 +113,37 @@ ActionResult NPCSystem::chooseNPCDialogue(const std::string& npcId,
                                           GameContext& ctx) {
     if (npcs_.empty()) initializeNPCs();
     const std::string id = normalizeNPCId(npcId);
+    if (id == "npc_child") {
+        if (ctx.world.hasFlag(kChildQuest))
+            return {false, "豆豆已经安全回到猴群。", false, false};
+        if (!ctx.world.hasFlag("flag_child_found"))
+            return {false, "请先与豆豆交谈，确认她的情况。", false, false};
+        if (option == 3)
+            return {true, "你让豆豆留在安全处，决定先去寻找草药。", false, false};
+        if (option != 1 && option != 2)
+            return {false, "请选择 1、2 或 3。", false, false};
+        if (!ctx.player.hasItem("item_herb")) {
+            ctx.world.setFlag("flag_achievement_no_rice");
+            return {false,
+                    "没有草药，无法处理伤口。隐藏成就解锁：巧妇难为无米之炊！\n"
+                    "请选择 3 暂时离开，并去河谷附近寻找草药。",
+                    false, false};
+        }
+        ctx.player.removeItem("item_herb");
+        ctx.world.setFlag(kChildQuest);
+        ctx.player.changeReputation(15);
+        if (option == 1) {
+            ctx.world.setFlag("flag_healer_called_for_child");
+            return {true,
+                    "叶婆婆赶来敷好草药，并带豆豆返回猴王树。豆豆获得救治，声望+15。\n"
+                    "你获得了豆豆的神秘祝福。",
+                    true, false};
+        }
+        return {true,
+                "你替豆豆包扎伤口，把她安全背回猴王树。声望+15。\n"
+                "你获得了豆豆的神秘祝福。",
+                true, false};
+    }
     if (id != "npc_scout")
         return {false, "这个角色当前没有对话选项。", false, false};
     if (!ctx.world.hasFlag(kScoutMet))
@@ -154,8 +192,10 @@ std::string NPCSystem::getNPCQuest(const std::string& npcId,
         return "在果实森林找到藤蔓并交给闪尾。";
     if (id == "npc_healer" && !ctx.world.hasFlag(kHealerQuest))
         return "取得草药并交给叶婆婆。";
+    if (id == "npc_child" && !ctx.world.hasFlag("flag_child_found"))
+        return "前往清泉河谷寻找豆豆，并直接与她交谈。";
     if (id == "npc_child" && !ctx.world.hasFlag(kChildQuest))
-        return "在河谷找到并救回豆豆。";
+        return "准备一份草药，再与受伤的豆豆交谈并选择救治方式。";
     if (id == "npc_king" && !ctx.world.hasFlag(kKingSupport))
         return "提高声望并取得猴王对最终行动的支持。";
     if (id == "npc_hertz") return "取得完整日志后决定说服赫兹或与其战斗。";
@@ -194,11 +234,9 @@ ActionResult NPCSystem::completeNPCQuest(const std::string& npcId,
     if (id == "npc_child") {
         if (ctx.world.hasFlag(kChildQuest))
             return {false, "豆豆已经安全回到猴群。", false, false};
-        if (!ctx.world.hasFlag("flag_child_found"))
-            return {false, "你还没有在河谷找到豆豆。", false, false};
-        ctx.world.setFlag(kChildQuest);
-        ctx.player.changeReputation(15);
-        return {true, "你把豆豆安全送回猴王树。声望+15。", true, false};
+        return {false,
+                "豆豆任务现在通过对话完成：输入“对话 豆豆（talk child）”查看救治选项。",
+                false, false};
     }
     if (id == "npc_king") {
         if (ctx.world.hasFlag(kKingSupport))

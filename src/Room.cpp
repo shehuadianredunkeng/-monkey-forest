@@ -141,7 +141,9 @@ std::string getCommandHelp() {
            "拾取（take）[物品]：拾取物品，可使用中文名或短名称\n"
            "状态（status）：查看玩家状态\n"
            "背包（inventory）：查看随身物品\n"
-           "攻击（attack）/防御（guard）/分析（analyze）/破解（hack）：战斗动作\n"
+           "攻击（attack）/防御（guard）/偷窃（steal）：基础战斗动作\n"
+           "背包（inventory）：战斗中查看并使用物品\n"
+           "特殊战斗会另外提示分析（analyze）、破解（hack）等选项\n"
            "逃跑（escape）：完成闪尾任务后解锁\n"
            "香蕉（banana）<1/2/3>：回应赫兹的香蕉诱惑\n"
            "帮助（help）：再次显示本页";
