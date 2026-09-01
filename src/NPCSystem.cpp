@@ -43,6 +43,17 @@ ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
     const std::string id = normalizeNPCId(npcId);
     if (!findNPC(id)) return {false, "这里没有这个角色。", false, false};
 
+    // 玩家只需要持续使用“对话（talk）”：满足条件时自动提交并结算任务。
+    if (id == "npc_scout" && ctx.world.hasFlag(kScoutChoiceMade) &&
+        !ctx.world.hasFlag(kScoutQuest) && ctx.player.hasItem("item_rope"))
+        return completeNPCQuest(id, ctx);
+    if (id == "npc_healer" && !ctx.world.hasFlag(kHealerQuest) &&
+        ctx.player.hasItem("item_herb"))
+        return completeNPCQuest(id, ctx);
+    if (id == "npc_king" && !ctx.world.hasFlag(kKingSupport) &&
+        ctx.player.getReputation() >= 60)
+        return completeNPCQuest(id, ctx);
+
     std::string text;
     if (id == "npc_king") {
         if (ctx.world.getStage() <= 2) {
@@ -69,9 +80,8 @@ ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
                    "2. 先谢了哥，回头给你带巴拿拿（香蕉）\n"
                    "请输入：对话 闪尾 1/2（talk scout 1/2）。";
         } else {
-            text = ctx.player.hasItem("item_rope")
-                ? "闪尾瞧见你带来的藤蔓，眼睛一亮：就是它！输入“完成 闪尾（finish scout）”交给我吧。"
-                : "闪尾：答应哥的藤蔓还没影儿呢。去果实森林找一根能荡的藤蔓吧！";
+            text = "闪尾：答应哥的藤蔓还没影儿呢。去果实森林找一根能荡的藤蔓吧！\n"
+                   "找到后回来再次与我对话（talk），哥马上教你保命绝活。";
         }
     } else if (id == "npc_healer") {
         if (ctx.world.hasFlag(kHealerQuest)) {
@@ -158,13 +168,13 @@ ActionResult NPCSystem::chooseNPCDialogue(const std::string& npcId,
         ctx.world.setFlag(kScoutFightRequest);
         return {true,
                 "闪尾：打不过不要紧，你找根能荡的绳儿给我，哥自有办法～\n"
-                "任务更新：前往果实森林寻找藤蔓，取得后输入“完成 闪尾（finish scout）”。",
+                "任务更新：前往果实森林寻找藤蔓，取得后回来再次与闪尾对话（talk）。",
                 true, false};
     }
     ctx.world.setFlag(kScoutBananaPromise);
     return {true,
             "闪尾：嘿～这么客气呢，那帮哥找根趁手能荡的藤蔓，有机会哥带你去溜溜！\n"
-            "任务更新：前往果实森林寻找藤蔓，取得后输入“完成 闪尾（finish scout）”。",
+            "任务更新：前往果实森林寻找藤蔓，取得后回来再次与闪尾对话（talk）。",
             true, false};
 }
 

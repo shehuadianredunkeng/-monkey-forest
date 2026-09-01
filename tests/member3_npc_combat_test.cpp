@@ -50,7 +50,7 @@ void testNpcTasksUsePlayerAndWorldInterfaces() {
     expect(npcs.chooseNPCDialogue("闪尾", 2, ctx).success,
            "scout dialogue choice should work");
     expect(player.addItem(Item("item_rope", "藤索", true, 1)), "rope setup failed");
-    const ActionResult scout = npcs.completeNPCQuest("npc_scout", ctx);
+    const ActionResult scout = npcs.talkToNPC("闪尾", ctx);
     expect(scout.success, "scout quest should accept rope");
     expect(world.hasFlag("flag_scout_help"), "scout help flag missing");
     expect(world.hasFlag("flag_skill_escape_unlocked"), "escape skill missing");
@@ -59,7 +59,7 @@ void testNpcTasksUsePlayerAndWorldInterfaces() {
 
     player.changeHealth(-30);
     expect(player.addItem(Item("item_herb", "草药")), "herb setup failed");
-    const ActionResult healer = npcs.completeNPCQuest("npc_healer", ctx);
+    const ActionResult healer = npcs.talkToNPC("叶婆婆", ctx);
     expect(healer.success && player.getHealth() == 95, "healer quest result mismatch");
     expect(!player.hasItem("item_herb"), "ordinary herb should be consumed");
 
@@ -73,6 +73,16 @@ void testNpcTasksUsePlayerAndWorldInterfaces() {
     expect(npcs.chooseNPCDialogue("豆豆", 2, ctx).success,
            "child rescue should complete through dialogue");
     expect(world.hasFlag("flag_child_rescued"), "child rescue flag missing");
+
+    player.changeReputation(60);
+    expect(npcs.talkToNPC("岩背", ctx).success,
+           "king support should complete through talk");
+    expect(world.hasFlag("flag_king_support"), "king support flag missing");
+
+    const std::string help = getCommandHelp();
+    expect(help.find("quest") == std::string::npos &&
+               help.find("finish") == std::string::npos,
+           "player help must not expose quest or finish commands");
 }
 
 void testTheftAndBeeDefenseAchievements() {
