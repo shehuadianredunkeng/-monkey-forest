@@ -19,6 +19,7 @@ target_include_directories(monkey_player PUBLIC include)
 
 add_library(monkey_npc_combat
     src/Character.cpp
+    src/CollectionSystem.cpp
     src/Enemy.cpp
     src/NPCSystem.cpp
     src/CombatSystem.cpp

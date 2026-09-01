@@ -1,4 +1,5 @@
 #include "CombatSystem.h"
+#include "CollectionSystem.h"
 #include "Item.h"
 #include "NPCSystem.h"
 #include "Player.h"
@@ -139,6 +140,36 @@ void testRepeatedEscapeEndingAndScoutDeparture() {
     expect(endingWorld.hasFlag("flag_hidden_ending_together_forever") &&
                endingWorld.hasFlag("flag_achievement_no_monkey_at_tree"),
            "hidden ending and achievement flags missing");
+    CollectionSystem collections;
+    expect(collections.isEndingUnlocked("ending_together_forever", endingWorld) &&
+               collections.isAchievementUnlocked(
+                   "achievement_no_monkey_at_tree", endingWorld),
+           "hidden ending should enter both collections");
+}
+
+void testCollectionSystemSupportsNewAndLegacyEndings() {
+    WorldState world;
+    CollectionSystem collections;
+    expect(collections.endings().size() == 8, "all current endings must be registered");
+    expect(collections.unlockEnding("ending_resist", world),
+           "registered main ending should unlock");
+    expect(collections.unlockedEndingCount(world) == 1,
+           "ending collection should count without duplicates");
+    expect(collections.unlockEnding("ending_resist", world) &&
+               collections.unlockedEndingCount(world) == 1,
+           "repeated ending must remain deduplicated");
+
+    collections.registerEnding({"ending_future_test", "未来结局", "测试扩展", true});
+    expect(collections.unlockEnding("ending_future_test", world),
+           "other members should be able to register a new ending");
+    expect(collections.unlockedEndingCount(world) == 2,
+           "new registered ending should automatically enter collection count");
+
+    WorldState legacyWorld;
+    legacyWorld.setFlag("flag_bad_ending_gluttony");
+    collections.syncLegacyFlags(legacyWorld);
+    expect(collections.isEndingUnlocked("ending_gluttony", legacyWorld),
+           "old ending flags should be imported");
 }
 
 void testTheftAndBeeDefenseAchievements() {
@@ -275,6 +306,7 @@ int main() {
         testEscapeSkillAndHertzBananaChoice();
         testHertzBananaBadEndings();
         testRepeatedEscapeEndingAndScoutDeparture();
+        testCollectionSystemSupportsNewAndLegacyEndings();
         testNpcPlacementMatchesQuestFlow();
     } catch (const std::exception& error) {
         std::cerr << "member3_npc_combat_test failed: " << error.what() << '\n';

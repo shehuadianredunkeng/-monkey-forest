@@ -44,7 +44,11 @@
   `flag_achievement_next_line_after_forest_fire`（“放火烧山的下一句”）、
   `flag_achievement_no_monkey_at_tree`（“猴王树查无此猴”）。
 - 隐藏结局标记：`flag_hidden_ending_together_forever`（“双宿双飞”）。
-- 5号负责把这些成就标记永久保存到独立成就文件；不要与普通存档一起覆盖。
+- 新增`CollectionSystem`，已收录当前4个主结局、3个坏结局、1个隐藏结局及3号现有成就。
+- 新结局使用`registerEnding`登记，并在达成处调用`unlockEnding`；系统自动去重、计数和显示。
+- 旧存档加载后调用`syncLegacyFlags`，可把旧式旗标补录到收集系统。
+- 5号负责把收集旗标永久保存到独立收集文件；不要与普通存档一起覆盖。
+- 今日完整接口和各成员注意事项见`docs/member3-latest-integration-summary.md`。
 - `random`次数限制属于2号`EventSystem`，3号分支不直接修改该模块。
 - 5号需要按纯接口实现完整`WorldState`；3号测试中的状态实现仅用于独立测试。
 

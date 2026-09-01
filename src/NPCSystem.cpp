@@ -1,4 +1,5 @@
 #include "NPCSystem.h"
+#include "CollectionSystem.h"
 
 #include "Player.h"
 #include "WorldState.h"
@@ -138,6 +139,8 @@ ActionResult NPCSystem::chooseNPCDialogue(const std::string& npcId,
             return {false, "请选择 1、2 或 3。", false, false};
         if (!ctx.player.hasItem("item_herb")) {
             ctx.world.setFlag("flag_achievement_no_rice");
+            CollectionSystem().unlockAchievement(
+                "achievement_no_rice", ctx.world);
             return {false,
                     "没有草药，无法处理伤口。隐藏成就解锁：巧妇难为无米之炊！\n"
                     "请选择 3 暂时离开，并去河谷附近寻找草药。",

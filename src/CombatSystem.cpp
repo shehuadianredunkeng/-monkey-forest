@@ -1,4 +1,5 @@
 #include "CombatSystem.h"
+#include "CollectionSystem.h"
 
 #include "Player.h"
 #include "PlayerActions.h"
@@ -186,6 +187,8 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
                 guardText = "蜂群逐渐找到了攻击你的方式，但你灵活走位，仍让它们撞作一团。";
             } else {
                 ctx.world.setFlag("flag_achievement_you_fight_back");
+                CollectionSystem().unlockAchievement(
+                    "achievement_you_fight_back", ctx.world);
                 guardText = "蜂群已经看穿你的套路。隐藏成就解锁：你倒是还手啊！";
             }
             battleState_.enemyHealth = std::max(0, battleState_.enemyHealth - counterDamage);
@@ -286,6 +289,9 @@ ActionResult CombatSystem::chooseEscapeEndingOption(int option,
     if (option == 1) {
         ctx.world.setFlag("flag_hidden_ending_together_forever");
         ctx.world.setFlag("flag_achievement_no_monkey_at_tree");
+        CollectionSystem collections;
+        collections.unlockEnding("ending_together_forever", ctx.world);
+        collections.unlockAchievement("achievement_no_monkey_at_tree", ctx.world);
         return {true,
                 "你伸出手，闪尾咧嘴一笑。两只吗喽抓住同一根藤蔓，"
                 "越过河谷，也越过了青木谷的边界。\n"
@@ -321,6 +327,8 @@ void CombatSystem::recordTheftAchievement(GameContext& ctx) {
         ctx.world.setFlag("flag_theft_streak_2");
     } else {
         ctx.world.setFlag("flag_achievement_monkey_borrow");
+        CollectionSystem().unlockAchievement(
+            "achievement_monkey_borrow", ctx.world);
     }
 }
 
@@ -366,6 +374,10 @@ ActionResult CombatSystem::handleFlintAttack(GameContext& ctx) {
         ctx.player.changeHealth(-ctx.player.getHealth());
         ctx.world.setFlag("flag_bad_ending_forest_fire");
         ctx.world.setFlag("flag_achievement_next_line_after_forest_fire");
+        CollectionSystem collections;
+        collections.unlockEnding("ending_forest_fire", ctx.world);
+        collections.unlockAchievement(
+            "achievement_next_line_after_forest_fire", ctx.world);
         clearBattle();
         return {false,
                 "火星落进枯叶，风把火舌卷向整片青木谷。\n"
@@ -391,6 +403,7 @@ ActionResult CombatSystem::handleBananaChoice(const std::string& target,
         if (target == "2") {
             ctx.player.changeHealth(-ctx.player.getHealth());
             ctx.world.setFlag("flag_bad_ending_second_banana");
+            CollectionSystem().unlockEnding("ending_second_banana", ctx.world);
             clearBattle();
             return {false,
                     "你嘴上说着不吃了，手却再次伸向巴拿拿。\n"
@@ -405,6 +418,7 @@ ActionResult CombatSystem::handleBananaChoice(const std::string& target,
         ActionResult hit = enemyCounterAttack(ctx, false);
         if (ctx.player.getHealth() <= 0) {
             ctx.world.setFlag("flag_bad_ending_gluttony");
+            CollectionSystem().unlockEnding("ending_gluttony", ctx.world);
             return {false,
                     "赫兹不断递来巴拿拿，而你只知道一根接一根地吃。\n"
                     "坏结局：你犯下了暴食罪！",
@@ -437,6 +451,7 @@ ActionResult CombatSystem::handleBananaChoice(const std::string& target,
     ActionResult hit = enemyCounterAttack(ctx, false);
     if (ctx.player.getHealth() <= 0) {
         ctx.world.setFlag("flag_bad_ending_gluttony");
+        CollectionSystem().unlockEnding("ending_gluttony", ctx.world);
         return {false, "你沉迷巴拿拿，直到倒在赫兹面前。\n坏结局：你犯下了暴食罪！",
                 true, true};
     }
@@ -454,6 +469,8 @@ ActionResult CombatSystem::enemyCounterAttack(GameContext& ctx, bool guarded) {
         const int roll = randomPercent();
         if (roll == 1) {
             ctx.world.setFlag("flag_achievement_doudou_bond");
+            CollectionSystem().unlockAchievement(
+                "achievement_doudou_bond", ctx.world);
             ActionResult victory = finishVictory(ctx, *enemy);
             victory.message = "豆豆的神秘祝福化作一道金光，直接击败了对手！"
                               "隐藏成就解锁：不要小瞧你与豆豆的羁绊啊！" + victory.message;
