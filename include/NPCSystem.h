@@ -14,6 +14,7 @@ public:
     ActionResult chooseNPCDialogue(const std::string& npcId,
                                    int option,
                                    GameContext& ctx);
+    ActionResult chooseDialogueOption(int option, GameContext& ctx);
     bool npcWillHelp(const std::string& npcId, const GameContext& ctx) const;
     std::string getNPCQuest(const std::string& npcId,
                             const GameContext& ctx) const;
@@ -21,6 +22,7 @@ public:
 
 private:
     std::map<std::string, NPC> npcs_;
+    std::string activeDialogueNpcId_;
 
     const NPC* findNPC(const std::string& npcId) const;
     std::string normalizeNPCId(const std::string& npcId) const;

@@ -17,6 +17,7 @@ constexpr const char* kKingSupport = "flag_king_support";
 
 void NPCSystem::initializeNPCs() {
     npcs_.clear();
+    activeDialogueNpcId_.clear();
     npcs_.emplace("npc_king", NPC{"npc_king", "岩背", "稳重而谨慎的老猴王。"});
     npcs_.emplace("npc_scout", NPC{"npc_scout", "闪尾", "行动敏捷、喜欢冒险的侦察猴。"});
     npcs_.emplace("npc_healer", NPC{"npc_healer", "叶婆婆", "熟悉森林草药的年长医护猴。"});
@@ -42,6 +43,7 @@ ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
     if (npcs_.empty()) initializeNPCs();
     const std::string id = normalizeNPCId(npcId);
     if (!findNPC(id)) return {false, "这里没有这个角色。", false, false};
+    activeDialogueNpcId_.clear();
 
     // 玩家只需要持续使用“对话（talk）”：满足条件时自动提交并结算任务。
     if (id == "npc_scout" && ctx.world.hasFlag(kScoutChoiceMade) &&
@@ -75,10 +77,11 @@ ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
             text = "闪尾主动和你打招呼：嘿！小猴儿，有什么需要帮忙的找哥就是了，哥罩着你！\n"
                    "再次与闪尾对话即可回应他。";
         } else if (!ctx.world.hasFlag(kScoutChoiceMade)) {
+            activeDialogueNpcId_ = id;
             text = "闪尾：说吧，小猴儿，想让哥怎么帮你？\n"
                    "1. 我打不过人家，你能帮我打回去不\n"
                    "2. 先谢了哥，回头给你带巴拿拿（香蕉）\n"
-                   "请输入：talk 闪尾 1/2（也可输入 talk scout 1/2）。";
+                   "请直接输入 1 或 2。";
         } else {
             text = "闪尾：答应哥的藤蔓还没影儿呢。去果实森林找一根能荡的藤蔓吧！\n"
                    "找到后回来再次与我对话（talk），哥马上教你保命绝活。";
@@ -101,11 +104,12 @@ ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
             text = "你在河谷边找到了豆豆。她的腿被划伤，正强忍着眼泪。\n"
                    "豆豆：我走不动了……你能帮帮我吗？再次与豆豆对话查看办法。";
         } else {
+            activeDialogueNpcId_ = id;
             text = "豆豆的伤口还在流血，你准备怎么做？\n"
                    "1. 找叶婆婆前来救治【需要草药】\n"
                    "2. 给豆豆疗伤后将她带回猴王树【需要草药】\n"
                    "3. 暂时离开，寻找草药\n"
-                   "请输入：talk 豆豆 1/2/3（也可输入 talk child 1/2/3）。";
+                   "请直接输入 1、2 或 3。";
         }
     } else {
         if (!ctx.world.hasFlag("flag_complete_log"))
@@ -176,6 +180,15 @@ ActionResult NPCSystem::chooseNPCDialogue(const std::string& npcId,
             "闪尾：嘿～这么客气呢，那帮哥找根趁手能荡的藤蔓，有机会哥带你去溜溜！\n"
             "任务更新：前往果实森林寻找藤蔓，取得后回来再次与闪尾对话（talk）。",
             true, false};
+}
+
+ActionResult NPCSystem::chooseDialogueOption(int option, GameContext& ctx) {
+    if (activeDialogueNpcId_.empty())
+        return {false, "当前没有等待选择的对话，请先输入 talk NPC名。", false, false};
+    const std::string npcId = activeDialogueNpcId_;
+    ActionResult result = chooseNPCDialogue(npcId, option, ctx);
+    if (result.success || option == 3) activeDialogueNpcId_.clear();
+    return result;
 }
 
 bool NPCSystem::npcWillHelp(const std::string& npcId,

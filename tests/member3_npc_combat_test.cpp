@@ -47,7 +47,7 @@ void testNpcTasksUsePlayerAndWorldInterfaces() {
     expect(npcs.talkToNPC("闪尾", ctx).success, "Chinese NPC alias should work");
     expect(npcs.talkToNPC("闪尾", ctx).message.find("1.") != std::string::npos,
            "second scout talk should show choices");
-    expect(npcs.chooseNPCDialogue("闪尾", 2, ctx).success,
+    expect(npcs.chooseDialogueOption(2, ctx).success,
            "scout dialogue choice should work");
     expect(player.addItem(Item("item_rope", "藤索", true, 1)), "rope setup failed");
     const ActionResult scout = npcs.talkToNPC("闪尾", ctx);
@@ -65,12 +65,14 @@ void testNpcTasksUsePlayerAndWorldInterfaces() {
 
     expect(npcs.talkToNPC("豆豆", ctx).success,
            "talking to child should find the injured child");
-    expect(!npcs.chooseNPCDialogue("豆豆", 2, ctx).success,
+    expect(npcs.talkToNPC("豆豆", ctx).message.find("请直接输入") != std::string::npos,
+           "second child talk should open bare-number choices");
+    expect(!npcs.chooseDialogueOption(2, ctx).success,
            "child treatment must require herb");
     expect(world.hasFlag("flag_achievement_no_rice"),
            "missing-herb achievement flag missing");
     expect(player.addItem(Item("item_herb", "草药")), "second herb setup failed");
-    expect(npcs.chooseNPCDialogue("豆豆", 2, ctx).success,
+    expect(npcs.chooseDialogueOption(2, ctx).success,
            "child rescue should complete through dialogue");
     expect(world.hasFlag("flag_child_rescued"), "child rescue flag missing");
 

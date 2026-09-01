@@ -21,7 +21,8 @@
 - 战斗中的`use`直接调用4号`PlayerActions.h`提供的`useItem`。
 - 藤索被4号定义为关键物品，完成闪尾任务时仅检查并保留，不调用`removeItem`。
 - 新增`GameContext.h`兼容入口；实际类型仍沿用1号、4号`CommonTypes.h`中的定义。
-- 4号主循环在解析`talk 闪尾 1`或`对话 闪尾 1`后，调用`chooseNPCDialogue("闪尾", 1, ctx)`。
+- 4号主循环解析`talk 闪尾`后调用`talkToNPC("闪尾", ctx)`；若随后输入裸数字`1`，调用`chooseDialogueOption(1, ctx)`。
+- 不要要求玩家输入`talk 闪尾 1`或`talk 豆豆 2`；NPC系统会保存当前等待选择的对话对象。
 - 场景按“中文名（英文名）”显示NPC；玩家可输入任一名称，如`talk 闪尾`或`talk scout`。
 - `npc_scout`等带`npc_`前缀的编号仅供程序内部兼容，不向玩家展示。
 - 玩家侧不再提供`quest`和`finish`：所有NPC任务均由`talkToNPC`获取，满足条件后再次调用同一接口自动提交。
