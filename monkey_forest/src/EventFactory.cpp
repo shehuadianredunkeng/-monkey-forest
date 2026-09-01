@@ -17,7 +17,7 @@ std::map<std::string, Event> createAllEvents() {
         {
             "闯入蜂群附近抢下果实（进入野蜂战斗）",
             "沿枯枝攀到树冠背面采集（攀爬路线）",
-            "观察枝叶后选择最安全的路线（保底路线）"
+            "观察枝叶、蜂群和果实的规律后采集（一次性智慧成长）"
         },
         "flag_event_tree_trial_done", EventKind::Main, true
     });
@@ -38,11 +38,12 @@ std::map<std::string, Event> createAllEvents() {
     add({
         "event_glowing_river",
         "发光的河水",
-        "清泉表面漂着不自然的蓝光，一根银色管线钻进岩壁，谷中的水位正在下降。",
+        "清泉表面漂着不自然的蓝光，一根银色管线钻进岩壁，谷中的水位正在下降。"
+        "解决水源问题后，仍可在河谷输入 investigate 管线 补充研究抽水规律。",
         3, 3, "room_river", {"flag_event_winter_shortage_done"},
         {
             "搬开压住水道的岩石（力量路线）",
-            "沿管线寻找抽水装置（智慧路线）",
+            "观察管线水声与震动，推断抽水规律（无需智慧门槛）",
             "组织猴群共同挖出新水道（声望路线）"
         },
         "flag_event_glowing_river_done", EventKind::Main, false
@@ -51,10 +52,11 @@ std::map<std::string, Event> createAllEvents() {
     add({
         "event_echo_tracking",
         "回声追踪",
-        "管线延伸进回声山洞。三组不同的回声指向深处，猴形影子在石壁后迅速闪过。",
+        "管线延伸进回声山洞。三组回声指向深处，石壁上留着旧猴群的刻痕。"
+        "可对照刻痕理解声音传播的方向；失败后仍可继续研究。",
         3, 3, "room_cave", {"flag_water_fixed"},
         {
-            "分析回声间隔，判断正确岔路（智慧路线）",
+            "阅读旧刻痕，分析三段回声并判断岔路（无需智慧门槛）",
             "从高处石梁绕过落石区（攀爬路线）",
             "请闪尾带路并搜索隐蔽出口（同伴路线）"
         },
@@ -68,7 +70,7 @@ std::map<std::string, Event> createAllEvents() {
         4, 4, "room_river", {"flag_chip_found"},
         {
             "训练守卫并储备反击工具",
-            "研究晶片，寻找关闭抽取塔的方法",
+            "研究晶片结构，寻找关闭抽取塔的方法（不消耗晶片，无需智慧门槛）",
             "沿河谷上游寻找适合迁徙的新家园"
         },
         "flag_event_drought_choice_done", EventKind::Main, false
