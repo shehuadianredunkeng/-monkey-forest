@@ -22,11 +22,11 @@ std::string joinIds(const std::vector<std::string>& ids) {
 }
 
 std::string npcDisplayName(const std::string& id) {
-    if (id == "npc_king") return "岩背";
-    if (id == "npc_scout") return "闪尾";
-    if (id == "npc_healer") return "叶婆婆";
-    if (id == "npc_child") return "豆豆";
-    if (id == "npc_hertz") return "赫兹";
+    if (id == "npc_king") return "岩背（king）";
+    if (id == "npc_scout") return "闪尾（scout）";
+    if (id == "npc_healer") return "叶婆婆（healer）";
+    if (id == "npc_child") return "豆豆（child）";
+    if (id == "npc_hertz") return "赫兹（hertz）";
     return id;
 }
 
@@ -154,7 +154,7 @@ std::string getCommandHelp() {
     return "===== 帮助（help）=====\n"
            "查看（look）：查看当前场景\n"
            "移动（go）<方向>：前往相邻地点\n"
-           "对话（talk）[角色] [选项]：获取、推进并提交NPC任务；只有一名角色时可省略名称\n"
+           "对话（talk）[中文名/英文名] [选项]：获取、推进并提交NPC任务；只有一名角色时可省略名称\n"
            "拾取（take）[物品]：拾取物品，可使用中文名或短名称\n"
            "状态（status）：查看玩家状态\n"
            "背包（inventory）：查看随身物品\n"

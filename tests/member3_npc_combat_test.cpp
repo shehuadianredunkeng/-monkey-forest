@@ -86,9 +86,11 @@ void testNpcTasksUsePlayerAndWorldInterfaces() {
 
     player.setCurrentRoomId("room_forest");
     const std::string roomText = lookAround(ctx);
-    expect(roomText.find("闪尾") != std::string::npos &&
+    expect(roomText.find("闪尾（scout）") != std::string::npos &&
                roomText.find("npc_scout") == std::string::npos,
            "room should show NPC name instead of internal id");
+    expect(npcs.talkToNPC("scout", ctx).success,
+           "English NPC name should remain accepted");
 }
 
 void testTheftAndBeeDefenseAchievements() {

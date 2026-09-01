@@ -78,7 +78,7 @@ ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
             text = "闪尾：说吧，小猴儿，想让哥怎么帮你？\n"
                    "1. 我打不过人家，你能帮我打回去不\n"
                    "2. 先谢了哥，回头给你带巴拿拿（香蕉）\n"
-                   "请输入：talk 闪尾 1/2（或：对话 闪尾 1/2）。";
+                   "请输入：talk 闪尾 1/2（也可输入 talk scout 1/2）。";
         } else {
             text = "闪尾：答应哥的藤蔓还没影儿呢。去果实森林找一根能荡的藤蔓吧！\n"
                    "找到后回来再次与我对话（talk），哥马上教你保命绝活。";
@@ -105,7 +105,7 @@ ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
                    "1. 找叶婆婆前来救治【需要草药】\n"
                    "2. 给豆豆疗伤后将她带回猴王树【需要草药】\n"
                    "3. 暂时离开，寻找草药\n"
-                   "请输入：talk 豆豆 1/2/3（或：对话 豆豆 1/2/3）。";
+                   "请输入：talk 豆豆 1/2/3（也可输入 talk child 1/2/3）。";
         }
     } else {
         if (!ctx.world.hasFlag("flag_complete_log"))
@@ -157,7 +157,7 @@ ActionResult NPCSystem::chooseNPCDialogue(const std::string& npcId,
     if (id != "npc_scout")
         return {false, "这个角色当前没有对话选项。", false, false};
     if (!ctx.world.hasFlag(kScoutMet))
-        return {false, "请先输入 talk 闪尾。", false, false};
+        return {false, "请先输入 talk 闪尾（或 talk scout）。", false, false};
     if (ctx.world.hasFlag(kScoutChoiceMade))
         return {false, "你已经回应过闪尾了。请按约定寻找藤蔓。", false, false};
     if (option != 1 && option != 2)
@@ -245,7 +245,7 @@ ActionResult NPCSystem::completeNPCQuest(const std::string& npcId,
         if (ctx.world.hasFlag(kChildQuest))
             return {false, "豆豆已经安全回到猴群。", false, false};
         return {false,
-                "豆豆任务现在通过对话完成：输入 talk 豆豆 查看救治选项。",
+                "豆豆任务现在通过对话完成：输入 talk 豆豆（或 talk child）查看救治选项。",
                 false, false};
     }
     if (id == "npc_king") {
