@@ -23,6 +23,10 @@
 - 新增`GameContext.h`兼容入口；实际类型仍沿用1号、4号`CommonTypes.h`中的定义。
 - 4号主循环解析`talk 闪尾`后调用`talkToNPC("闪尾", ctx)`；若随后输入裸数字`1`，调用`chooseDialogueOption(1, ctx)`。
 - 不要要求玩家输入`talk 闪尾 1`或`talk 豆豆 2`；NPC系统会保存当前等待选择的对话对象。
+- 第四次成功使用逃跑后会产生闪尾邀请；4号主循环收到裸数字时，若存在
+  `flag_pending_scout_wander_choice`，优先调用`chooseEscapeEndingOption(option, ctx)`。
+- 闪尾完成任务加入队伍、豆豆获救后，1号`lookAround`会把他们从原房间NPC列表隐藏。
+- 玩家亲自背豆豆回猴王树（豆豆选项2）后，`currentRoomId`会更新为`room_tree`。
 - 场景按“中文名（英文名）”显示NPC；玩家可输入任一名称，如`talk 闪尾`或`talk scout`。
 - `npc_scout`等带`npc_`前缀的编号仅供程序内部兼容，不向玩家展示。
 - 玩家侧不再提供`quest`和`finish`：所有NPC任务均由`talkToNPC`获取，满足条件后再次调用同一接口自动提交。
@@ -37,7 +41,9 @@
   `flag_child_rescued`、`flag_king_support`、三种敌人击败旗标，以及以下成就标记：
   `flag_achievement_monkey_borrow`、`flag_achievement_you_fight_back`、
   `flag_achievement_doudou_bond`、`flag_achievement_no_rice`、
-  `flag_achievement_next_line_after_forest_fire`（“放火烧山的下一句”）。
+  `flag_achievement_next_line_after_forest_fire`（“放火烧山的下一句”）、
+  `flag_achievement_no_monkey_at_tree`（“猴王树查无此猴”）。
+- 隐藏结局标记：`flag_hidden_ending_together_forever`（“双宿双飞”）。
 - 5号负责把这些成就标记永久保存到独立成就文件；不要与普通存档一起覆盖。
 - `random`次数限制属于2号`EventSystem`，3号分支不直接修改该模块。
 - 5号需要按纯接口实现完整`WorldState`；3号测试中的状态实现仅用于独立测试。

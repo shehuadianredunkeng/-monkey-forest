@@ -75,6 +75,8 @@ void testNpcTasksUsePlayerAndWorldInterfaces() {
     expect(npcs.chooseDialogueOption(2, ctx).success,
            "child rescue should complete through dialogue");
     expect(world.hasFlag("flag_child_rescued"), "child rescue flag missing");
+    expect(player.getCurrentRoomId() == "room_tree",
+           "carrying child home should move player to king tree");
 
     player.changeReputation(60);
     expect(npcs.talkToNPC("岩背", ctx).success,
@@ -88,11 +90,55 @@ void testNpcTasksUsePlayerAndWorldInterfaces() {
 
     player.setCurrentRoomId("room_forest");
     const std::string roomText = lookAround(ctx);
-    expect(roomText.find("闪尾（scout）") != std::string::npos &&
-               roomText.find("npc_scout") == std::string::npos,
-           "room should show NPC name instead of internal id");
+    expect(roomText.find("闪尾") == std::string::npos,
+           "scout should disappear from forest after joining party");
     expect(npcs.talkToNPC("scout", ctx).success,
            "English NPC name should remain accepted");
+}
+
+void testRepeatedEscapeEndingAndScoutDeparture() {
+    Player player;
+    WorldState world;
+    auto rooms = createAllRooms();
+    GameContext ctx{player, world, rooms};
+    CombatSystem combat;
+    world.setFlag("flag_skill_escape_unlocked");
+    world.setFlag("flag_scout_help");
+    expect(player.addItem(Item("item_fruit", "果实")), "fruit setup failed");
+
+    for (int count = 0; count < 4; ++count) {
+        expect(combat.startBattle("enemy_bees", ctx).success, "escape battle should start");
+        const ActionResult escaped = combat.performBattleAction("逃跑", "", ctx);
+        expect(escaped.success, "escape should succeed");
+        if (count == 3)
+            expect(escaped.message.find("闯荡天涯") != std::string::npos,
+                   "fourth escape should trigger invitation");
+    }
+    const ActionResult refused = combat.chooseEscapeEndingOption(2, ctx);
+    expect(refused.success && world.hasFlag("flag_scout_left"),
+           "refusing invitation should remove scout");
+    expect(!player.hasItem("item_fruit"), "scout should take one fruit");
+
+    Player endingPlayer;
+    WorldState endingWorld;
+    auto endingRooms = createAllRooms();
+    GameContext endingCtx{endingPlayer, endingWorld, endingRooms};
+    CombatSystem endingCombat;
+    endingWorld.setFlag("flag_skill_escape_unlocked");
+    endingWorld.setFlag("flag_scout_help");
+    endingWorld.setFlag("flag_escape_used_1");
+    endingWorld.setFlag("flag_escape_used_2");
+    endingWorld.setFlag("flag_escape_used_3");
+    expect(endingCombat.startBattle("enemy_bees", endingCtx).success,
+           "hidden-ending battle should start");
+    expect(endingCombat.performBattleAction("escape", "", endingCtx).success,
+           "hidden-ending escape should work");
+    const ActionResult accepted = endingCombat.chooseEscapeEndingOption(1, endingCtx);
+    expect(accepted.success && accepted.stageCompleted,
+           "accepting invitation should complete hidden ending");
+    expect(endingWorld.hasFlag("flag_hidden_ending_together_forever") &&
+               endingWorld.hasFlag("flag_achievement_no_monkey_at_tree"),
+           "hidden ending and achievement flags missing");
 }
 
 void testTheftAndBeeDefenseAchievements() {
@@ -206,11 +252,19 @@ void testRobotHackAndHertzArmor() {
 }
 
 void testNpcPlacementMatchesQuestFlow() {
-    const auto rooms = createAllRooms();
+    Player player;
+    WorldState world;
+    auto rooms = createAllRooms();
+    GameContext ctx{player, world, rooms};
     expect(rooms.at("room_base").getNPCIds().front() == "npc_hertz",
            "Hertz must be visible in base");
     expect(rooms.at("room_river").getNPCIds().front() == "npc_child",
            "child rescue NPC must be in river");
+    player.setCurrentRoomId("room_forest");
+    const std::string roomText = lookAround(ctx);
+    expect(roomText.find("闪尾（scout）") != std::string::npos &&
+               roomText.find("npc_scout") == std::string::npos,
+           "unrecruited scout should display with bilingual name");
 }
 
 int main() {
@@ -220,6 +274,7 @@ int main() {
         testRobotHackAndHertzArmor();
         testEscapeSkillAndHertzBananaChoice();
         testHertzBananaBadEndings();
+        testRepeatedEscapeEndingAndScoutDeparture();
         testNpcPlacementMatchesQuestFlow();
     } catch (const std::exception& error) {
         std::cerr << "member3_npc_combat_test failed: " << error.what() << '\n';

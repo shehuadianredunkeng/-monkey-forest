@@ -27,6 +27,7 @@ public:
     ActionResult performBattleAction(const std::string& action,
                                      const std::string& target,
                                      GameContext& ctx);
+    ActionResult chooseEscapeEndingOption(int option, GameContext& ctx);
 
     const BattleState& getBattleState() const;
     bool isInBattle() const;

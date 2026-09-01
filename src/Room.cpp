@@ -30,14 +30,23 @@ std::string npcDisplayName(const std::string& id) {
     return id;
 }
 
-std::string describeNPCs(const std::vector<std::string>& ids) {
-    if (ids.empty()) return "无";
+std::string describeNPCs(const std::vector<std::string>& ids,
+                         const WorldState& world) {
     std::ostringstream output;
+    bool first = true;
     for (std::size_t index = 0; index < ids.size(); ++index) {
-        if (index > 0) output << "、";
+        const std::string& id = ids[index];
+        if (id == "npc_scout" &&
+            (world.hasFlag("flag_scout_quest_complete") ||
+             world.hasFlag("flag_scout_left")))
+            continue;
+        if (id == "npc_child" && world.hasFlag("flag_child_rescued"))
+            continue;
+        if (!first) output << "、";
         output << npcDisplayName(ids[index]);
+        first = false;
     }
-    return output.str();
+    return first ? "无" : output.str();
 }
 
 std::string describeExits(const std::map<std::string, std::string>& exits,
@@ -144,7 +153,7 @@ std::string lookAround(const GameContext& context) {
     output << "【" << room.getName() << "】\n";
     output << room.getBaseDescription() << "\n";
     output << "出口：" << describeExits(room.getExits(), context.rooms) << "\n";
-    output << "NPC：" << describeNPCs(room.getNPCIds()) << "\n";
+    output << "NPC：" << describeNPCs(room.getNPCIds(), context.world) << "\n";
     output << "物品：" << joinIds(room.getItemIds()) << "\n";
     output << room.getRecommendedAction();
     return output.str();

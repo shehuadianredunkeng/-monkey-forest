@@ -155,7 +155,8 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
         battleState_.enemyHealth = std::max(0, battleState_.enemyHealth - damage);
         if (battleState_.enemyHealth == 0) return finishVictory(ctx, *enemy);
         std::string followUp;
-        if (ctx.world.hasFlag("flag_scout_help") && randomPercent() <= 35) {
+        if (ctx.world.hasFlag("flag_scout_help") &&
+            !ctx.world.hasFlag("flag_scout_left") && randomPercent() <= 35) {
             battleState_.enemyHealth = std::max(0, battleState_.enemyHealth - 3);
             followUp = randomScoutFollowUp();
             if (battleState_.enemyHealth == 0) {
@@ -249,11 +250,68 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
     if (command == "escape") {
         if (!ctx.world.hasFlag("flag_skill_escape_unlocked"))
             return {false, "你还没有解锁“逃跑”。完成闪尾的藤蔓任务后再试。", false, false};
+        if (ctx.world.hasFlag("flag_scout_left"))
+            return {false, "闪尾已经离开队伍，现在没人能带你荡出战场。", false, false};
         clearBattle();
+        if (!ctx.world.hasFlag("flag_escape_used_1")) {
+            ctx.world.setFlag("flag_escape_used_1");
+        } else if (!ctx.world.hasFlag("flag_escape_used_2")) {
+            ctx.world.setFlag("flag_escape_used_2");
+        } else if (!ctx.world.hasFlag("flag_escape_used_3")) {
+            ctx.world.setFlag("flag_escape_used_3");
+        } else if (!ctx.world.hasFlag("flag_scout_wander_invitation_resolved")) {
+            ctx.world.setFlag("flag_pending_scout_wander_choice");
+            return {true,
+                    "闪尾从天而降，抓起你就荡着藤蔓跑了。\n"
+                    "落地后，闪尾忽然认真起来：小猴儿，咱俩配合这么默契，"
+                    "干脆别守在这一棵树上了。跟哥一起闯荡天涯，怎么样？\n"
+                    "1. 接受\n2. 拒绝\n请直接输入 1 或 2。",
+                    true, false};
+        }
         return {true, "闪尾从天而降，抓起你就荡着藤蔓跑了。", true, false};
     }
     return {false, "无法识别这个战斗指令。你可以选择：攻击、防御、分析、破解、使用物品或逃跑。",
             false, false};
+}
+
+ActionResult CombatSystem::chooseEscapeEndingOption(int option,
+                                                    GameContext& ctx) {
+    if (!ctx.world.hasFlag("flag_pending_scout_wander_choice"))
+        return {false, "当前没有等待处理的闪尾邀请。", false, false};
+    if (option != 1 && option != 2)
+        return {false, "请选择 1 或 2。", false, false};
+
+    ctx.world.removeFlag("flag_pending_scout_wander_choice");
+    ctx.world.setFlag("flag_scout_wander_invitation_resolved");
+    if (option == 1) {
+        ctx.world.setFlag("flag_hidden_ending_together_forever");
+        ctx.world.setFlag("flag_achievement_no_monkey_at_tree");
+        return {true,
+                "你伸出手，闪尾咧嘴一笑。两只吗喽抓住同一根藤蔓，"
+                "越过河谷，也越过了青木谷的边界。\n"
+                "隐藏结局：双宿双飞\n"
+                "隐藏成就解锁：猴王树查无此猴",
+                true, true};
+    }
+
+    ctx.world.setFlag("flag_scout_left");
+    ctx.world.removeFlag("flag_scout_help");
+    std::string cost;
+    if (ctx.player.hasItem("item_fruit") && ctx.player.removeItem("item_fruit")) {
+        cost = "闪尾临走时顺手带走了一个水果。";
+    } else if (ctx.world.getResource(ResourceType::MigrationSupply) > 0) {
+        ctx.world.changeResource(ResourceType::MigrationSupply, -1);
+        cost = "闪尾临走时带走了1份迁徙物资。";
+    } else if (ctx.world.getResource(ResourceType::Food) > 0) {
+        ctx.world.changeResource(ResourceType::Food, -1);
+        cost = "闪尾临走时带走了1份食物。";
+    } else {
+        cost = "闪尾翻遍背包也没找到水果，只好空着手走了。";
+    }
+    return {true,
+            "你摇了摇头。闪尾沉默片刻，还是挥挥手独自荡向远方。" + cost +
+            "闪尾已离开队伍。",
+            true, false};
 }
 
 void CombatSystem::recordTheftAchievement(GameContext& ctx) {
@@ -419,7 +477,8 @@ ActionResult CombatSystem::enemyCounterAttack(GameContext& ctx, bool guarded) {
         move = "赫兹释放能源震荡";
     }
     int damage = std::max(1, attack - ctx.player.getStrength());
-    if (ctx.world.hasFlag("flag_scout_help")) damage = std::max(1, damage - 2);
+    if (ctx.world.hasFlag("flag_scout_help") && !ctx.world.hasFlag("flag_scout_left"))
+        damage = std::max(1, damage - 2);
     if (guarded) damage = std::max(1, damage / 2);
     ctx.player.changeHealth(-damage);
     if (ctx.world.hasFlag("flag_healer_supplied") && ctx.player.getHealth() > 0)

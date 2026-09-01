@@ -153,9 +153,10 @@ ActionResult NPCSystem::chooseNPCDialogue(const std::string& npcId,
                     "你获得了豆豆的神秘祝福。",
                     true, false};
         }
+        ctx.player.setCurrentRoomId("room_tree");
         return {true,
                 "你替豆豆包扎伤口，把她安全背回猴王树。声望+15。\n"
-                "你获得了豆豆的神秘祝福。",
+                "你获得了豆豆的神秘祝福。当前位置已更新为猴王树。",
                 true, false};
     }
     if (id != "npc_scout")
@@ -194,7 +195,8 @@ ActionResult NPCSystem::chooseDialogueOption(int option, GameContext& ctx) {
 bool NPCSystem::npcWillHelp(const std::string& npcId,
                             const GameContext& ctx) const {
     const std::string id = normalizeNPCId(npcId);
-    if (id == "npc_scout") return ctx.world.hasFlag(kScoutQuest);
+    if (id == "npc_scout")
+        return ctx.world.hasFlag(kScoutQuest) && !ctx.world.hasFlag("flag_scout_left");
     if (id == "npc_king")
         return ctx.player.getReputation() >= 60 || ctx.world.hasFlag(kKingSupport);
     if (id == "npc_healer") return ctx.world.hasFlag(kHealerQuest);
