@@ -307,10 +307,12 @@ ActionResult CombatSystem::handleFlintAttack(GameContext& ctx) {
     if (randomPercent() <= 50) {
         ctx.player.changeHealth(-ctx.player.getHealth());
         ctx.world.setFlag("flag_bad_ending_forest_fire");
+        ctx.world.setFlag("flag_achievement_next_line_after_forest_fire");
         clearBattle();
         return {false,
                 "火星落进枯叶，风把火舌卷向整片青木谷。\n"
-                "坏结局：放火烧山。",
+                "坏结局：放火烧山。\n"
+                "隐藏成就解锁：放火烧山的下一句",
                 true, true};
     }
     const Enemy* enemy = currentEnemy();

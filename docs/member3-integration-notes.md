@@ -35,7 +35,8 @@
   `flag_bad_ending_second_banana`、`flag_bad_ending_gluttony`、`flag_healer_supplied`、
   `flag_child_rescued`、`flag_king_support`、三种敌人击败旗标，以及以下成就标记：
   `flag_achievement_monkey_borrow`、`flag_achievement_you_fight_back`、
-  `flag_achievement_doudou_bond`、`flag_achievement_no_rice`。
+  `flag_achievement_doudou_bond`、`flag_achievement_no_rice`、
+  `flag_achievement_next_line_after_forest_fire`（“放火烧山的下一句”）。
 - 5号负责把这些成就标记永久保存到独立成就文件；不要与普通存档一起覆盖。
 - `random`次数限制属于2号`EventSystem`，3号分支不直接修改该模块。
 - 5号需要按纯接口实现完整`WorldState`；3号测试中的状态实现仅用于独立测试。
