@@ -2,12 +2,13 @@
 
 #include "Item.h"
 #include "Room.h"
+#include "WorldState.h"
 
 #include <algorithm>
-#include <optional>
 #include <sstream>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace
 {
@@ -21,29 +22,47 @@ ActionResult makeResult(bool success, std::string message, bool turnConsumed)
     return ActionResult{success, std::move(message), turnConsumed, false};
 }
 
-std::optional<Item> createKnownItem(const std::string& itemId)
+struct ItemInfo
 {
-    if (itemId == "item_fruit")
+    const char* id;
+    const char* name;
+    const char* shortName;
+    const char* chineseAlias;
+    bool important;
+};
+
+const ItemInfo* findItemInfo(const std::string& target)
+{
+    static constexpr ItemInfo items[] = {
+        {"item_fruit", "果实", "fruit", "果实", false},
+        {"item_herb", "草药", "herb", "草药", false},
+        {"item_rope", "藤索", "rope", "藤索", true},
+        {"item_flint", "燧石", "flint", "燧石", true},
+        {"item_chip", "星猿晶片", "chip", "晶片", true},
+    };
+    for (const auto& item : items)
     {
-        return Item(itemId, "果实");
+        if (target == item.id || target == item.name ||
+            target == item.shortName || target == item.chineseAlias)
+        {
+            return &item;
+        }
     }
-    if (itemId == "item_herb")
+    return nullptr;
+}
+
+std::string joinNames(const std::vector<std::string>& names)
+{
+    std::string text;
+    for (const auto& name : names)
     {
-        return Item(itemId, "草药");
+        if (!text.empty())
+        {
+            text += "、";
+        }
+        text += name;
     }
-    if (itemId == "item_rope")
-    {
-        return Item(itemId, "绳索", true, 1);
-    }
-    if (itemId == "item_flint")
-    {
-        return Item(itemId, "燧石", true, 1);
-    }
-    if (itemId == "item_chip")
-    {
-        return Item(itemId, "芯片", true, 1);
-    }
-    return std::nullopt;
+    return text;
 }
 
 std::string skillName(SkillType type)
@@ -72,57 +91,120 @@ ActionResult takeItem(const std::string& itemId, GameContext& ctx)
     }
 
     const auto& roomItemIds = room->second.getItemIds();
-    if (std::find(roomItemIds.cbegin(), roomItemIds.cend(), itemId) ==
-        roomItemIds.cend())
+    const ItemInfo* target = itemId.empty() ? nullptr : findItemInfo(itemId);
+    if (!itemId.empty() && target == nullptr)
+    {
+        return makeResult(false, "无法识别该物品。", false);
+    }
+    if (target != nullptr &&
+        std::find(roomItemIds.cbegin(), roomItemIds.cend(), target->id) == roomItemIds.cend())
     {
         return makeResult(false, "当前房间没有该物品。", false);
     }
 
-    const std::optional<Item> item = createKnownItem(itemId);
-    if (!item.has_value())
+    std::vector<std::string> obtained;
+    std::vector<std::string> blocked;
+    bool unknownItem = false;
+    for (const auto& roomItemId : roomItemIds)
     {
-        return makeResult(false, "无法识别该物品。", false);
+        if (target != nullptr && roomItemId != target->id)
+        {
+            continue;
+        }
+        // Use the integration main's existing per-room pickup flag convention.
+        // Only the main marks successful pickups; this action never writes WorldState.
+        if (ctx.world.hasFlag("flag_taken_" + ctx.player.getCurrentRoomId() + "_" + roomItemId))
+        {
+            if (target != nullptr)
+            {
+                return makeResult(false, "这个位置的该物品已经被拿走。", false);
+            }
+            continue;
+        }
+        const auto* info = findItemInfo(roomItemId);
+        if (info == nullptr)
+        {
+            unknownItem = true;
+            continue;
+        }
+        if (ctx.player.addItem(Item(info->id, info->name, info->important, 1)))
+        {
+            obtained.emplace_back(info->name);
+        }
+        else
+        {
+            blocked.emplace_back(info->name);
+        }
     }
 
-    if (!ctx.player.addItem(*item))
+    std::string message;
+    if (!obtained.empty())
     {
-        return makeResult(false, "背包已满，无法拾取该物品。", false);
+        message = "你拾取了：" + joinNames(obtained) + "。";
     }
-
-    return makeResult(true, "你拾取了" + item->getName() + "。", true);
+    else if (!blocked.empty())
+    {
+        message = "背包已满，无法拾取这里的物品。";
+    }
+    else if (!unknownItem)
+    {
+        message = "这里没有可以拾取的物品。";
+    }
+    if (!obtained.empty() && !blocked.empty())
+    {
+        message += "\n背包空间不足，未能拾取：" + joinNames(blocked) + "。";
+    }
+    if (unknownItem)
+    {
+        if (!message.empty())
+        {
+            message += '\n';
+        }
+        message += "部分物品无法识别，未能拾取。";
+    }
+    const bool success = !obtained.empty();
+    return makeResult(success, std::move(message), success);
 }
 
 ActionResult useItem(const std::string& itemId, GameContext& ctx)
 {
-    if (!ctx.player.hasItem(itemId))
+    const auto* info = findItemInfo(itemId);
+    const std::string canonicalId = info == nullptr ? itemId : info->id;
+    if (!ctx.player.hasItem(canonicalId))
     {
         return makeResult(false, "背包中没有该物品。", false);
     }
 
-    if (itemId == "item_herb")
+    if (canonicalId == "item_herb")
     {
         if (ctx.player.getHealth() >= 100)
         {
             return makeResult(false, "生命值已满，不需要使用草药。", false);
         }
+        if (!ctx.player.removeItem(canonicalId))
+        {
+            return makeResult(false, "该物品受到保护，无法消耗。", false);
+        }
         ctx.player.changeHealth(HERB_HEALTH_RECOVERY);
-        ctx.player.removeItem(itemId);
         return makeResult(true, "你使用草药恢复了生命。", true);
     }
 
-    if (itemId == "item_fruit")
+    if (canonicalId == "item_fruit")
     {
         if (ctx.player.getStamina() >= 100)
         {
             return makeResult(false, "体力已满，不需要食用果实。", false);
         }
+        if (!ctx.player.removeItem(canonicalId))
+        {
+            return makeResult(false, "该物品受到保护，无法消耗。", false);
+        }
         ctx.player.changeStamina(FRUIT_STAMINA_RECOVERY);
-        ctx.player.removeItem(itemId);
         return makeResult(true, "你食用果实恢复了体力。", true);
     }
 
-    if (itemId == "item_rope" || itemId == "item_flint" ||
-        itemId == "item_chip")
+    if (canonicalId == "item_rope" || canonicalId == "item_flint" ||
+        canonicalId == "item_chip")
     {
         return makeResult(false, "该物品需要在特定事件中使用。", false);
     }
@@ -163,14 +245,20 @@ std::string showInventory(const Player& player)
     const auto& items = player.getInventory().getItems();
     if (items.empty())
     {
-        return "背包为空。";
+        return "背包 0/8\n背包为空。";
     }
 
     std::ostringstream output;
-    output << "背包：";
+    output << "背包 " << items.size() << "/8";
     for (const Item& item : items)
     {
-        output << "\n- " << item.getName() << " x" << item.getCount();
+        const auto* info = findItemInfo(item.getId());
+        output << "\n- " << (info == nullptr ? item.getName() : info->name)
+               << " x" << item.getCount();
+        if (info != nullptr)
+        {
+            output << " [" << info->shortName << " / " << info->chineseAlias << "]";
+        }
     }
     return output.str();
 }
