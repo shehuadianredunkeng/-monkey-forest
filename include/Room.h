@@ -25,6 +25,11 @@ public:
     const std::vector<std::string>& getItemIds() const;
     const std::string& getRecommendedAction() const;
 
+    // 动态场景接口：保留旧接口，避免影响其他成员现有代码。
+    std::vector<std::string> getVisibleNPCIds(const GameContext& context) const;
+    std::vector<std::string> getVisibleItemIds(const GameContext& context) const;
+    std::string getDynamicRecommendation(const GameContext& context) const;
+
 private:
     std::string id_;
     std::string name_;
@@ -38,4 +43,5 @@ private:
 std::map<std::string, Room> createAllRooms();
 ActionResult movePlayer(GameContext& context, const std::string& direction);
 std::string lookAround(const GameContext& context);
+std::string showMap(const GameContext& context);
 std::string getCommandHelp();
