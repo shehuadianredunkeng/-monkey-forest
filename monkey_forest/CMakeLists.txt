@@ -86,6 +86,16 @@ target_link_libraries(member5_tests PRIVATE
     monkey_map
 )
 
+add_executable(wisdom_growth_tests tests/wisdom_growth_test.cpp)
+target_link_libraries(wisdom_growth_tests PRIVATE
+    monkey_event monkey_world monkey_player monkey_map
+)
+
+add_executable(wisdom_main_tests tests/wisdom_main_test.cpp)
+target_link_libraries(wisdom_main_tests PRIVATE
+    monkey_event monkey_npc_combat monkey_world monkey_player monkey_map
+)
+
 if(MSVC)
     target_compile_options(monkey_map PRIVATE /utf-8)
     target_compile_options(monkey_player PRIVATE /utf-8)
@@ -98,6 +108,8 @@ if(MSVC)
     target_compile_options(monkey_world PRIVATE /utf-8)
     target_compile_options(member5_tests PRIVATE /utf-8)
     target_compile_options(monkey_forest_game PRIVATE /utf-8)
+    target_compile_options(wisdom_growth_tests PRIVATE /utf-8)
+    target_compile_options(wisdom_main_tests PRIVATE /utf-8)
 endif()
 
 enable_testing()
@@ -106,3 +118,5 @@ add_test(NAME member4_tests COMMAND member4_tests)
 add_test(NAME member3_tests COMMAND member3_tests)
 add_test(NAME member2_tests COMMAND member2_tests)
 add_test(NAME member5_tests COMMAND member5_tests)
+add_test(NAME wisdom_growth_tests COMMAND wisdom_growth_tests)
+add_test(NAME wisdom_main_tests COMMAND wisdom_main_tests)

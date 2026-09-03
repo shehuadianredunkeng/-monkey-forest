@@ -7,12 +7,90 @@
 #include "GameContext.h"
 #include "Item.h"
 #include "Player.h"
+#include "Room.h"
 #include "StoryText.h"
 #include "WorldState.h"
 
 namespace {
 
 constexpr const char* kRandomRequestId = "random";
+
+// Persistent reward identifiers. SaveManager already saves all WorldState flags.
+// Chip study reuses the two existing, successful research outcomes as ONE reward.
+struct WisdomReward {
+    const char* eventId;
+    const char* flag;
+    const char* alternateFlag;
+    const char* roomId;
+    int minStage;
+    const char* discovery;
+    const char* repeated;
+};
+
+constexpr WisdomReward kTreeWisdom{
+    "event_tree_trial", "flag_wisdom_tree", "", "room_forest", 1,
+    "你没有急着攀上树冠，而是先观察枝叶、蜂群和果实分布的规律。"
+    "你开始学会在行动之前先理解环境。",
+    "枝叶与蜂群的规律你已经理解过了，继续观察没有新的收获。"};
+constexpr WisdomReward kRiverWisdom{
+    "event_glowing_river", "flag_wisdom_river", "", "room_river", 3,
+    "你贴近银色管线，仔细听着内部持续的水声。管线规律的震动表明，"
+    "外部装置正在持续抽取地下水。你开始理解这些陌生机器的工作方式。",
+    "你已经弄清了银色管线的抽水规律，继续观察没有新的发现。"};
+constexpr WisdomReward kCaveWisdom{
+    "event_echo_tracking", "flag_wisdom_cave", "", "room_cave", 3,
+    "你把石壁上的旧刻痕与三段回声联系起来。原来这些痕迹不是装饰，"
+    "而是在记录声音传播的方向。你终于读懂了前人留下的规律。",
+    "这些刻痕与回声的关系你已经理解了。"};
+constexpr WisdomReward kChipWisdom{
+    "event_drought_choice", "flag_route_hack_ready", "flag_drone_analyzed", "", 2,
+    "你没有破坏晶片，而是反复观察它表面的纹路与响应方式。"
+    "闪烁的光点逐渐显现出规律，星猿技术不再像最初那样完全陌生。",
+    "你已经研究过这枚晶片，现在没有发现新的规律。"};
+constexpr WisdomReward kBaseWisdom{
+    "event_base_infiltration", "flag_wisdom_base", "", "room_base", 5,
+    "你把零散的星猿日志按照时间重新排列。抽取量、能源变化与森林中的异常，"
+    "终于连成了一条完整的线索。这些设备真正的目的越来越清楚。",
+    "这些日志你已经重新整理过了，没有新的信息。"};
+
+const WisdomReward* researchTarget(const std::string& request) {
+    if (request == "树冠") return &kTreeWisdom;
+    if (request == "管线" || request == "银色管线") return &kRiverWisdom;
+    if (request == "碑文" || request == "回声") return &kCaveWisdom;
+    if (request == "晶片" || request == "星猿晶片") return &kChipWisdom;
+    if (request == "日志" || request == "控制台") return &kBaseWisdom;
+    return nullptr;
+}
+
+const WisdomReward* eventReward(const std::string& eventId) {
+    for (const auto* reward : {&kTreeWisdom, &kRiverWisdom, &kCaveWisdom,
+                               &kChipWisdom, &kBaseWisdom}) {
+        if (eventId == reward->eventId) return reward;
+    }
+    return eventId == "event_drone_crash" ? &kChipWisdom : nullptr;
+}
+
+bool hasWisdomReward(const WisdomReward& reward, const WorldState& world) {
+    return world.hasFlag(reward.flag) ||
+           (reward.alternateFlag[0] != '\0' && world.hasFlag(reward.alternateFlag));
+}
+
+std::string awardWisdom(const WisdomReward& reward, GameContext& ctx,
+                        const char* outcomeFlag = nullptr) {
+    if (hasWisdomReward(reward, ctx.world)) return reward.repeated;
+    const int before = ctx.player.getWisdom();
+    ctx.player.changeWisdom(1);
+    ctx.world.setFlag(outcomeFlag == nullptr ? reward.flag : outcomeFlag);
+    return std::string(reward.discovery) +
+           (ctx.player.getWisdom() > before
+                ? "\n【智慧 +1】"
+                : "\n你进一步确认了自己的判断，但智慧已达上限，不再提高。");
+}
+
+bool opensOriginalEvent(const WisdomReward& reward) {
+    return &reward == &kTreeWisdom || &reward == &kRiverWisdom ||
+           &reward == &kCaveWisdom;
+}
 
 bool isBlankEventRequest(const std::string& eventId) {
     return eventId.empty() || eventId == "current";
@@ -94,6 +172,32 @@ bool EventSystem::canTriggerEvent(const std::string& eventId,
     if (events_.empty()) {
         return false;
     }
+    if (const auto* reward = researchTarget(eventId)) {
+        if (ctx.world.hasFlag("flag_final_choice") ||
+            ctx.world.getStage() < reward->minStage ||
+            ctx.rooms.count(ctx.player.getCurrentRoomId()) == 0 ||
+            (reward->roomId[0] != '\0' &&
+             ctx.player.getCurrentRoomId() != reward->roomId)) {
+            return false;
+        }
+        const Event* original = findEvent(reward->eventId);
+        if (original == nullptr) return false;
+        if (opensOriginalEvent(*reward) &&
+            !ctx.world.hasFlag(original->completionFlag)) {
+            return canTriggerEvent(original->eventId, ctx);
+        }
+        if (reward == &kTreeWisdom) return hasWisdomReward(*reward, ctx.world);
+        if (reward == &kRiverWisdom || reward == &kCaveWisdom) {
+            return ctx.world.hasFlag("flag_water_fixed");
+        }
+        if (!ctx.player.hasItem("item_chip")) return false;
+        if (reward == &kBaseWisdom) {
+            return ctx.world.hasFlag("flag_base_open") &&
+                   ctx.world.hasFlag("flag_chip_found") &&
+                   ctx.world.hasFlag("flag_complete_log");
+        }
+        return true;
+    }
     if (eventId == kRandomRequestId) {
         return chooseRandomEvent(ctx) != nullptr;
     }
@@ -136,6 +240,24 @@ ActionResult EventSystem::triggerEvent(const std::string& eventId,
                           "事件系统尚未初始化，请先调用 initializeEvents()。");
     }
 
+    if (const auto* reward = researchTarget(eventId)) {
+        if (!canTriggerEvent(eventId, ctx)) {
+            return makeResult(false,
+                "当前还不能完成这项研究：请确认地点和剧情进度，"
+                "晶片研究需要持有星猿晶片，日志研究需要先取得完整日志。"
+                "已结束的树冠试炼不能重新选择方案。");
+        }
+        const Event* original = findEvent(reward->eventId);
+        if (opensOriginalEvent(*reward) &&
+            !ctx.world.hasFlag(original->completionFlag)) {
+            return triggerEvent(original->eventId, ctx);
+        }
+        // Follow-up study never replays the event or changes a pending choice.
+        // In particular, a pending final choice must not block late research.
+        const bool claimed = hasWisdomReward(*reward, ctx.world);
+        return makeResult(true, awardWisdom(*reward, ctx), !claimed, false);
+    }
+
     const Event* event = eventId == kRandomRequestId
                              ? chooseRandomEvent(ctx)
                              : findEvent(eventId);
@@ -146,6 +268,11 @@ ActionResult EventSystem::triggerEvent(const std::string& eventId,
                               : "不存在事件：" + eventId + "。");
     }
     if (!canTriggerEvent(event->eventId, ctx)) {
+        const auto* reward = eventReward(event->eventId);
+        if (reward != nullptr && ctx.world.hasFlag(event->completionFlag) &&
+            hasWisdomReward(*reward, ctx.world)) {
+            return makeResult(false, reward->repeated);
+        }
         return makeResult(false,
                           "当前阶段、地点或前置条件不允许触发【" +
                               event->title + "】。");
@@ -248,12 +375,12 @@ ActionResult EventSystem::resolveChoice(const Event& event,
             return makeResult(false, "体力至少需要8点才能完成采集。");
         }
         player.changeStamina(-8);
-        player.changeWisdom(1);
         player.changeReputation(3);
         world.changeResource(ResourceType::Food, 2);
         return completeEvent(
             event,
-            "你通过观察找到了安全路线。体力-8，智慧+1，声望+3，公共食物+2。",
+            "你通过观察找到了安全路线。体力-8，声望+3，公共食物+2。\n" +
+                awardWisdom(kTreeWisdom, ctx),
             ctx);
     }
 
@@ -311,21 +438,14 @@ ActionResult EventSystem::resolveChoice(const Event& event,
             if (player.getStamina() < 10) {
                 return makeResult(false, "体力至少需要10点才能追踪管线。");
             }
-            const bool understoodDevice = player.getWisdom() >= 2;
             player.changeStamina(-10);
-            if (understoodDevice) {
-                player.changeWisdom(1);
-            } else {
-                player.changeHealth(-5);
-            }
             world.changeResource(ResourceType::Water, 3);
             world.setFlag("flag_water_fixed");
             world.setFlag("flag_water_clue");
             return completeEvent(
                 event,
-                understoodDevice
-                    ? "你关闭了临时抽水阀并记住管线方向。体力-10，智慧+1，公共水源+3。"
-                    : "你勉强关闭抽水阀，却被设备灼伤。体力-10，生命-5，公共水源+3。",
+                "你关闭了临时抽水阀并记住管线方向。体力-10，公共水源+3。\n" +
+                    awardWisdom(kRiverWisdom, ctx),
                 ctx);
         }
         if (player.getReputation() < 20) {
@@ -342,6 +462,7 @@ ActionResult EventSystem::resolveChoice(const Event& event,
     }
 
     if (event.eventId == "event_echo_tracking") {
+        std::string researchMessage;
         if (option == 1) {
             if (player.getStamina() < 12) {
                 return makeResult(false,
@@ -352,11 +473,7 @@ ActionResult EventSystem::resolveChoice(const Event& event,
                                   "背包已满，无法安全取走星猿晶片。");
             }
             player.changeStamina(-12);
-            if (player.getWisdom() < 2) {
-                player.changeHealth(-5);
-            } else {
-                player.changeWisdom(1);
-            }
+            researchMessage = "\n" + awardWisdom(kCaveWisdom, ctx);
         } else if (option == 2) {
             if (player.getSkillLevel(SkillType::Climb) < 2) {
                 return makeResult(false, "该路线需要攀爬技能至少2级。");
@@ -385,7 +502,9 @@ ActionResult EventSystem::resolveChoice(const Event& event,
         world.setFlag("flag_base_clue_found");
         return completeEvent(
             event,
-            "你取得星猿晶片，并发现实验基地入口。晶片已放入背包。",
+            "你取得星猿晶片，并发现实验基地入口。晶片已放入背包。" +
+                researchMessage + "\n可输入 investigate 晶片 研究技术结构，"
+                "或在山洞输入 investigate 碑文 理解回声；研究不会消耗晶片。",
             ctx);
     }
 
@@ -405,14 +524,14 @@ ActionResult EventSystem::resolveChoice(const Event& event,
                 ctx);
         }
         if (option == 2) {
-            if (player.getWisdom() < 2) {
-                return makeResult(false, "研究晶片需要智慧至少2点。");
+            if (!player.hasItem("item_chip")) {
+                return makeResult(false, "研究需要背包中的星猿晶片。");
             }
-            player.changeWisdom(1);
+            const std::string researchMessage = awardWisdom(kChipWisdom, ctx);
             world.setFlag("flag_route_hack_ready");
             return completeEvent(
                 event,
-                "你破译了部分控制协议。智慧+1，智取路线准备完成。",
+                "你破译了部分控制协议，智取路线准备完成。\n" + researchMessage,
                 ctx);
         }
         if (player.getStamina() < 10) {
@@ -475,7 +594,8 @@ ActionResult EventSystem::resolveChoice(const Event& event,
             world.setFlag("flag_complete_log");
             return completeEvent(
                 event,
-                "巡逻机停止运转，你取得完整抽取日志。声望+8。",
+                "巡逻机停止运转，你取得完整抽取日志。声望+8。"
+                "\n可输入 investigate 日志 重组记录，不需要额外智慧门槛。",
                 ctx);
         }
         if (option == 2) {
@@ -485,11 +605,11 @@ ActionResult EventSystem::resolveChoice(const Event& event,
                 return makeResult(false,
                                   "伪装权限需要背包中的星猿晶片且智慧至少3点。");
             }
-            player.changeWisdom(1);
             world.setFlag("flag_complete_log");
             return completeEvent(
                 event,
-                "晶片骗过了控制台，你下载了完整日志。智慧+1。",
+                "晶片骗过了控制台，你下载了完整日志。\n" +
+                    awardWisdom(kBaseWisdom, ctx),
                 ctx);
         }
         if (!world.hasFlag("flag_scout_help") &&
@@ -502,7 +622,8 @@ ActionResult EventSystem::resolveChoice(const Event& event,
         world.setFlag("flag_complete_log");
         return completeEvent(
             event,
-            "闪尾引开巡逻机，你成功取得完整日志。声望+8。",
+            "闪尾引开巡逻机，你成功取得完整日志。声望+8。"
+            "\n可输入 investigate 日志 重组记录，不需要额外智慧门槛。",
             ctx);
     }
 
@@ -670,19 +791,17 @@ ActionResult EventSystem::resolveChoice(const Event& event,
 
     if (event.eventId == "event_drone_crash") {
         if (option == 1) {
-            if (player.getWisdom() < 2) {
-                return makeResult(false, "拆解核心需要智慧至少2点。");
-            }
             if (!grantChip(player)) {
                 return makeResult(false,
                                   "背包已满，无法安全取走星猿晶片。");
             }
-            player.changeWisdom(1);
+            const std::string researchMessage =
+                awardWisdom(kChipWisdom, ctx, kChipWisdom.alternateFlag);
             world.setFlag("flag_chip_found");
             world.setFlag("flag_drone_analyzed");
             return completeEvent(
                 event,
-                "你读出部分星猿数据并取得晶片。智慧+1，晶片已放入背包。",
+                "你读出部分星猿数据并取得晶片。晶片已放入背包。\n" + researchMessage,
                 ctx);
         }
         if (option == 2) {

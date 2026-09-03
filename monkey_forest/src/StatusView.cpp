@@ -62,6 +62,8 @@ std::string buildStatusText(const GameContext& ctx) {
     if (!flags.empty()) {
         out << "关键状态：";
         for (const std::string& flag : flags) {
+            // New reward bookkeeping is internal; retain legacy status output.
+            if (flag.rfind("flag_wisdom_", 0) == 0) continue;
             out << flag << ' ';
         }
         out << '\n';
