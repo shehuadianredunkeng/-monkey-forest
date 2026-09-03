@@ -370,6 +370,10 @@ bool commandIs(const std::string& command,
 }  // namespace
 
 int main() {
+#ifndef _WIN32
+    std::cerr << "此坐标界面需要 Windows 控制台；非 Windows 环境可运行 UI 单元测试。\n";
+    return 1;
+#endif
     configureConsole();
 
     ConsoleUI ui;
@@ -427,7 +431,7 @@ int main() {
 
         ui.render(ctx, combat, buildGuideText(ctx));
         line = ui.readCommand();
-        if (!std::cin) {
+        if (ui.inputClosed()) {
             break;
         }
 

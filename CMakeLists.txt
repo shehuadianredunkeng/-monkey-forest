@@ -46,10 +46,30 @@ add_library(monkey_state
 target_include_directories(monkey_state PUBLIC include)
 target_link_libraries(monkey_state PUBLIC monkey_player)
 
+add_library(monkey_ui
+    src/UI/TextLayout.cpp
+    src/UI/ConsoleRenderer.cpp
+    src/UI/GameUI.cpp
+    src/ConsoleUI.cpp
+)
+target_include_directories(monkey_ui PUBLIC include)
+target_link_libraries(monkey_ui PUBLIC monkey_map monkey_player monkey_state monkey_npc_combat)
+
 add_executable(monkey_forest_first_year src/main.cpp)
-target_sources(monkey_forest_first_year PRIVATE src/ConsoleUI.cpp)
 target_link_libraries(monkey_forest_first_year PRIVATE
-    monkey_map monkey_player monkey_npc_combat monkey_story monkey_state)
+    monkey_ui monkey_map monkey_player monkey_npc_combat monkey_story monkey_state)
+
+add_executable(ui_layout_tests tests/ui_layout_test.cpp)
+target_link_libraries(ui_layout_tests PRIVATE monkey_ui)
+
+# Native screen-buffer verification needs an attached Windows console; not a CI pipe.
+if(WIN32)
+    add_executable(ui_windows_smoke tests/ui_windows_smoke.cpp)
+    target_link_libraries(ui_windows_smoke PRIVATE monkey_ui)
+    if(MSVC)
+        target_compile_options(ui_windows_smoke PRIVATE /utf-8)
+    endif()
+endif()
 
 add_executable(map_tests
     tests/TestMain.cpp
@@ -73,6 +93,8 @@ target_link_libraries(member5_tests PRIVATE
     monkey_state monkey_story monkey_player monkey_map)
 
 if(MSVC)
+    target_compile_options(monkey_ui PRIVATE /utf-8)
+    target_compile_options(ui_layout_tests PRIVATE /utf-8)
     target_compile_options(monkey_map PRIVATE /utf-8)
     target_compile_options(monkey_player PRIVATE /utf-8)
     target_compile_options(map_tests PRIVATE /utf-8)
@@ -87,6 +109,7 @@ if(MSVC)
 endif()
 
 enable_testing()
+add_test(NAME ui_layout_tests COMMAND ui_layout_tests)
 add_test(NAME map_tests COMMAND map_tests)
 add_test(NAME member4_tests COMMAND member4_tests)
 add_test(NAME member3_tests COMMAND member3_tests)
