@@ -1,7 +1,8 @@
 #pragma once
 
+#include "UI/GameUI.h"
+
 #include <string>
-#include <vector>
 
 class CombatSystem;
 struct GameContext;
@@ -14,9 +15,11 @@ public:
                 const CombatSystem& combat,
                 const std::string& guideText);
     std::string readCommand();
+    bool inputClosed() const;
     void restoreCursor();
 
 private:
-    std::vector<std::wstring> history_;
+    UI::ConsoleRenderer renderer_;
+    UI::GameUI gameUI_;
+    bool inputClosed_ = false;
 };
-
