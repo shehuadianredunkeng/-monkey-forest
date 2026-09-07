@@ -651,6 +651,23 @@ ActionResult EventSystem::resolveChoice(const Event& event,
     }
 
     if (event.eventId == "event_final_choice") {
+        if (option == 4) {
+            const bool allRelics =
+                world.hasFlag("flag_season_relic_spring") &&
+                world.hasFlag("flag_season_relic_summer") &&
+                world.hasFlag("flag_season_relic_autumn") &&
+                world.hasFlag("flag_season_relic_winter");
+            if (!allRelics)
+                return makeResult(false,
+                    "祈福需要集齐四件信物：春花、蝉蜕、秋叶和落雪。");
+            world.setFlag("flag_hidden_ending_earth_gift");
+            world.setFlag("flag_final_choice");
+            return completeEvent(
+                event,
+                "你将四季信物放在猴王树根部，向脚下的土地祈福。"
+                "沉睡的自然之力回应了青木谷，地球的礼物已经苏醒。",
+                ctx);
+        }
         if (option == 1) {
             if (!world.hasFlag("flag_route_resist_ready") ||
                 player.getReputation() < 60 ||

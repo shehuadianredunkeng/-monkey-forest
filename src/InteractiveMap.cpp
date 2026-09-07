@@ -54,7 +54,40 @@ std::string itemName(const std::string& id) {
 std::string enemyName(const std::string& id) {
     if (id == "enemy_bees") return "暴躁蜂群";
     if (id == "enemy_robot") return "巡逻机器人";
+    if (id == "enemy_raider") return "流浪山魈";
+    if (id == "enemy_drone") return "侦察无人机";
+    if (id.find("enemy_season_guardian_") == 0) return "四季守望者";
     return id;
+}
+
+std::string baseEnemyId(const std::string& id) {
+    const std::size_t separator = id.find('@');
+    return separator == std::string::npos ? id : id.substr(0, separator);
+}
+
+std::string safeFlagPart(std::string text) {
+    std::replace(text.begin(), text.end(), '@', '_');
+    return text;
+}
+
+int seasonIndex(const GameContext& ctx) {
+    return (ctx.world.getTurnCount() / 6) % 4;
+}
+
+const char* seasonId(int season) {
+    static const char* ids[] = {"spring", "summer", "autumn", "winter"};
+    return ids[season % 4];
+}
+
+const char* seasonChinese(int season) {
+    static const char* names[] = {"春花", "蝉蜕", "秋叶", "落雪"};
+    return names[season % 4];
+}
+
+std::string seasonRoom(int season) {
+    static const char* rooms[] = {
+        "room_forest", "room_river", "room_cave", "room_tree"};
+    return rooms[season % 4];
 }
 }
 
@@ -110,13 +143,11 @@ InteractiveMap::InteractiveMap() {
     Definition cave;
     cave.terrain = terrain(cave.width, cave.height);
     cave.terrain[0][18] = 'D';
-    cave.terrain[7][35] = 'D';
     scatter(cave.terrain, '#', {{7, 3}, {8, 3}, {9, 3}, {25, 3},
                                 {26, 3}, {12, 8}, {13, 8}, {23, 11},
                                 {24, 11}, {25, 11}});
     cave.start = {18, 2};
     cave.doors[{18, 0}] = "north";
-    cave.doors[{35, 7}] = "east";
     cave.items[{9, 10}] = "item_flint";
     cave.items[{28, 4}] = "item_chip";
     cave.chests[{29, 10}] = "chest_cave";
@@ -126,12 +157,10 @@ InteractiveMap::InteractiveMap() {
     Definition base;
     base.terrain = terrain(base.width, base.height);
     base.terrain[7][0] = 'D';
-    base.terrain[0][18] = 'D';
     scatter(base.terrain, '#', {{8, 5}, {8, 6}, {8, 7}, {15, 3},
                                 {16, 3}, {24, 10}, {25, 10}, {29, 4}});
     base.start = {3, 7};
     base.doors[{0, 7}] = "west";
-    base.doors[{18, 0}] = "north";
     base.npcs[{27, 7}] = "npc_hertz";
     base.enemies[{12, 10}] = "enemy_robot";
     base.chests[{7, 4}] = "chest_base";
@@ -218,12 +247,116 @@ bool InteractiveMap::itemVisible(const std::string& itemId,
 
 bool InteractiveMap::enemyVisible(const std::string& enemyId,
                                   const GameContext& ctx) const {
+    if (enemyId.find('@') != std::string::npos)
+        return !ctx.world.hasFlag("flag_enemy_defeated_" +
+                                  safeFlagPart(enemyId));
     if (enemyId == "enemy_bees")
         return !ctx.world.hasFlag("flag_bees_defeated");
     if (enemyId == "enemy_robot")
         return ctx.world.hasFlag("flag_base_open") &&
                !ctx.world.hasFlag("flag_robot_defeated");
     return true;
+}
+
+bool InteractiveMap::doorLocked(const std::string& direction,
+                                const GameContext& ctx) const {
+    const auto room = ctx.rooms.find(roomId_);
+    if (room == ctx.rooms.end()) return false;
+    const auto exit = room->second.getExits().find(direction);
+    return exit != room->second.getExits().end() &&
+           exit->second == "room_base" &&
+           !ctx.world.hasFlag("flag_base_open");
+}
+
+std::vector<InteractiveMap::Point> InteractiveMap::dynamicPoints(
+    const GameContext& ctx) const {
+    const Definition* map = current();
+    if (map == nullptr) return {};
+    const Point candidates[] = {
+        {4, 3}, {18, 3}, {30, 6}, {4, 12}, {18, 11},
+        {31, 12}, {24, 4}, {10, 9}, {26, 12}, {14, 12}, {22, 6}};
+    std::vector<Point> available;
+    const Point quest = questPoint(ctx);
+    for (const Point point : candidates) {
+        if (map->terrain[point.y][point.x] == '#' ||
+            map->terrain[point.y][point.x] == '~' || point == quest ||
+            map->doors.count(point) || map->npcs.count(point) ||
+            map->items.count(point) || map->chests.count(point) ||
+            map->enemies.count(point) || map->eggs.count(point)) continue;
+        available.push_back(point);
+    }
+    if (!available.empty()) {
+        const std::size_t rotation = static_cast<std::size_t>(
+            ctx.world.getTurnCount()) % available.size();
+        std::rotate(available.begin(), available.begin() + rotation,
+                    available.end());
+    }
+    return available;
+}
+
+MapInteraction InteractiveMap::companionAt(Point point,
+                                           const GameContext& ctx) const {
+    if (!ctx.world.hasFlag("flag_scout_help") ||
+        ctx.world.hasFlag("flag_scout_left")) return {};
+    const std::vector<Point> points = dynamicPoints(ctx);
+    if (!points.empty() && point == points[0])
+        return {InteractionKind::Npc, "npc_scout", "和同行的闪尾聊聊天"};
+    return {};
+}
+
+MapInteraction InteractiveMap::seasonalGuardianAt(
+    Point point, const GameContext& ctx) const {
+    const int season = seasonIndex(ctx);
+    if (roomId_ != seasonRoom(season) ||
+        ctx.world.hasFlag(std::string("flag_season_relic_") +
+                          seasonId(season))) return {};
+    const std::vector<Point> points = dynamicPoints(ctx);
+    if (points.size() < 3) return {};
+    const std::string defeated = std::string("flag_season_guardian_defeated_") +
+                                 seasonId(season);
+    if (point == points[2] && ctx.world.hasFlag(defeated))
+        return {InteractionKind::EasterEgg,
+                std::string("season_relic_") + seasonId(season),
+                std::string("拾取稀有信物·") + seasonChinese(season)};
+    if (point == points[2])
+        return {InteractionKind::LockedItem,
+                std::string("season_relic_") + seasonId(season),
+                std::string("稀有信物·") + seasonChinese(season) +
+                    "被守望者保护着，需先挑战旁边的红色敌人"};
+    if (point == points[1])
+        return {InteractionKind::Enemy,
+                std::string("enemy_season_guardian_") + seasonId(season) +
+                    "@" + roomId_ + "@" +
+                    std::to_string(ctx.world.getTurnCount() / 6),
+                std::string("挑战守护") + seasonChinese(season) + "的四季守望者"};
+    return {};
+}
+
+MapInteraction InteractiveMap::randomEventAt(Point point,
+                                             const GameContext& ctx) const {
+    const std::vector<Point> points = dynamicPoints(ctx);
+    if (points.size() < 4 || !(point == points[3])) return {};
+    const std::string id = "location_event_" + roomId_ + "_" +
+                           std::to_string(ctx.world.getTurnCount());
+    if (ctx.world.hasFlag("flag_resolved_" + id)) return {};
+    return {InteractionKind::RandomEvent, id, "查看本回合新出现的地点异动"};
+}
+
+MapInteraction InteractiveMap::dynamicEnemyAt(Point point,
+                                              const GameContext& ctx) const {
+    const std::vector<Point> points = dynamicPoints(ctx);
+    for (std::size_t slot = 4; slot < points.size() && slot < 6; ++slot) {
+        if (!(point == points[slot])) continue;
+        const bool mechanical = roomId_ == "room_cave" || roomId_ == "room_base";
+        const std::string base = mechanical ? "enemy_drone" : "enemy_raider";
+        const std::string id = base + "@" + roomId_ + "@" +
+            std::to_string(ctx.world.getTurnCount()) + "@" +
+            std::to_string(slot - 4);
+        if (enemyVisible(id, ctx))
+            return {InteractionKind::Enemy, id,
+                    "迎战" + enemyName(base) + "（本回合游荡敌人）"};
+    }
+    return {};
 }
 
 InteractiveMap::Point InteractiveMap::questPoint(const GameContext& ctx) const {
@@ -311,6 +444,18 @@ MapInteraction InteractiveMap::interactionAt(Point point,
     if (egg != map->eggs.end() &&
         !ctx.world.hasFlag("flag_found_" + egg->second))
         return {InteractionKind::EasterEgg, egg->second, "调查闪光彩蛋"};
+    MapInteraction dynamic = companionAt(point, ctx);
+    if (dynamic.kind != InteractionKind::None) return dynamic;
+    dynamic = seasonalGuardianAt(point, ctx);
+    if (dynamic.kind != InteractionKind::None) return dynamic;
+    dynamic = randomEventAt(point, ctx);
+    if (dynamic.kind != InteractionKind::None) return dynamic;
+    dynamic = dynamicEnemyAt(point, ctx);
+    if (dynamic.kind != InteractionKind::None) return dynamic;
+    const auto door = map->doors.find(point);
+    if (door != map->doors.end() && doorLocked(door->second, ctx))
+        return {InteractionKind::LockedDoor, door->second,
+                "无法解锁：需推进至第四阶段、平息猴群分歧并取得基地线索"};
     return {};
 }
 
@@ -357,7 +502,26 @@ MapTileVisual InteractiveMap::visualAt(int x, int y,
     if (egg != map->eggs.end() &&
         !ctx.world.hasFlag("flag_found_" + egg->second))
         return {L"? ", UI::Color::Hint};
-    if (map->doors.count(point)) return {L"门", UI::Color::Door};
+    MapInteraction dynamic = companionAt(point, ctx);
+    if (dynamic.kind != InteractionKind::None)
+        return {L"伴", UI::Color::Item};
+    dynamic = seasonalGuardianAt(point, ctx);
+    if (dynamic.kind == InteractionKind::EasterEgg ||
+        dynamic.kind == InteractionKind::LockedItem)
+        return {L"物", UI::Color::Item};
+    if (dynamic.kind == InteractionKind::Enemy)
+        return {L"敌", UI::Color::Error};
+    dynamic = randomEventAt(point, ctx);
+    if (dynamic.kind != InteractionKind::None)
+        return {L"奇", UI::Color::Door};
+    dynamic = dynamicEnemyAt(point, ctx);
+    if (dynamic.kind != InteractionKind::None)
+        return {L"敌", UI::Color::Error};
+    const auto door = map->doors.find(point);
+    if (door != map->doors.end())
+        return doorLocked(door->second, ctx)
+            ? MapTileVisual{L"锁", UI::Color::Error}
+            : MapTileVisual{L"门", UI::Color::Door};
     const char tile = map->terrain[y][x];
     if (tile == '#') return {L"##", UI::Color::Wall};
     if (tile == '~') return {L"~~", UI::Color::Water};

@@ -153,7 +153,7 @@ void testCollectionSystemSupportsNewAndLegacyEndings() {
     worlds.clear();
     WorldState world;
     CollectionSystem collections;
-    expect(collections.endings().size() == 8, "all current endings must be registered");
+    expect(collections.endings().size() == 11, "all current endings must be registered");
     expect(collections.unlockEnding("ending_resist", world),
            "registered main ending should unlock");
     expect(collections.unlockedEndingCount(world) == 1,
@@ -289,6 +289,52 @@ void testRobotHackAndHertzArmor() {
     expect(world.hasFlag("flag_hertz_defeated"), "Hertz victory flag missing");
 }
 
+void testPersistentTheftAndCowardEnding() {
+    worlds.clear();
+    Player player;
+    WorldState world;
+    auto rooms = createAllRooms();
+    GameContext ctx{player, world, rooms};
+    CombatSystem combat;
+    world.setFlag("flag_skill_escape_unlocked");
+    world.setFlag("flag_scout_help");
+
+    const std::string encounter = "enemy_raider@room_tree@0@0";
+    expect(combat.startBattle(encounter, ctx).success, "dynamic enemy should start");
+    expect(combat.performBattleAction("steal", "", ctx).success,
+           "first lifetime theft should work");
+    expect(combat.performBattleAction("escape", "", ctx).success,
+           "escape after theft should work");
+    expect(combat.startBattle(encounter, ctx).success,
+           "escaped enemy should remain available");
+    const ActionResult empty = combat.performBattleAction("steal", "", ctx);
+    expect(!empty.success && empty.message.find("一贫如洗") != std::string::npos,
+           "same enemy must not be farmed by escaping");
+    expect(combat.performBattleAction("escape", "", ctx).success,
+           "second escape should work");
+
+    for (int count = 2; count < 4; ++count) {
+        expect(combat.startBattle("enemy_raider@room_tree@" +
+                                  std::to_string(count) + "@0", ctx).success,
+               "escape sequence battle should start");
+        expect(combat.performBattleAction("escape", "", ctx).success,
+               "escape sequence should continue");
+    }
+    expect(world.hasFlag("flag_pending_scout_wander_choice"),
+           "fourth escape should invite the player");
+    expect(combat.chooseEscapeEndingOption(2, ctx).success,
+           "refusing scout should remain valid");
+    for (int count = 4; count < 7; ++count) {
+        expect(combat.startBattle("enemy_raider@room_tree@" +
+                                  std::to_string(count) + "@0", ctx).success,
+               "solo escape battle should start");
+        expect(combat.performBattleAction("escape", "", ctx).success,
+               "solo escape should remain possible after scout leaves");
+    }
+    expect(world.hasFlag("flag_bad_ending_coward"),
+           "seventh escape should unlock coward ending");
+}
+
 void testNpcPlacementMatchesQuestFlow() {
     worlds.clear();
     Player player;
@@ -311,6 +357,7 @@ int main() {
         testNpcTasksUsePlayerAndWorldInterfaces();
         testTheftAndBeeDefenseAchievements();
         testRobotHackAndHertzArmor();
+        testPersistentTheftAndCowardEnding();
         testEscapeSkillAndHertzBananaChoice();
         testHertzBananaBadEndings();
         testRepeatedEscapeEndingAndScoutDeparture();

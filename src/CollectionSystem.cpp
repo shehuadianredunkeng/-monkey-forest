@@ -72,6 +72,9 @@ CollectionSystem::CollectionSystem() {
     registerEnding({"ending_second_banana", "有了第一次就有第二次！", "没能摆脱香蕉诱惑", true});
     registerEnding({"ending_gluttony", "你犯下了暴食罪！", "在香蕉诱惑中倒下", true});
     registerEnding({"ending_together_forever", "双宿双飞", "与闪尾闯荡天涯", true});
+    registerEnding({"ending_earth_gift", "地球的礼物", "以四季信物唤醒自然之力", true});
+    registerEnding({"ending_not_hero", "你不是英雄", "准备不足时仍要面对选择", false});
+    registerEnding({"ending_coward", "你是狗熊", "七次逃离守护家园的战斗", true});
 
     registerAchievement({"achievement_monkey_borrow", "吗喽的事怎么能叫偷呢！", "", true});
     registerAchievement({"achievement_you_fight_back", "你倒是还手啊！", "", true});
@@ -79,6 +82,7 @@ CollectionSystem::CollectionSystem() {
     registerAchievement({"achievement_no_rice", "巧妇难为无米之炊！", "", true});
     registerAchievement({"achievement_next_line_after_forest_fire", "放火烧山的下一句", "", true});
     registerAchievement({"achievement_no_monkey_at_tree", "猴王树查无此猴", "", true});
+    registerAchievement({"achievement_last_season", "最后的季节", "集齐春花、蝉蜕、秋叶和落雪", true});
 }
 
 void CollectionSystem::registerEnding(const CollectionEntry& entry) {
@@ -112,7 +116,10 @@ void CollectionSystem::syncLegacyFlags(WorldState& world) const {
         {"flag_bad_ending_forest_fire", "ending_forest_fire"},
         {"flag_bad_ending_second_banana", "ending_second_banana"},
         {"flag_bad_ending_gluttony", "ending_gluttony"},
-        {"flag_hidden_ending_together_forever", "ending_together_forever"}
+        {"flag_hidden_ending_together_forever", "ending_together_forever"},
+        {"flag_hidden_ending_earth_gift", "ending_earth_gift"},
+        {"flag_normal_ending_not_hero", "ending_not_hero"},
+        {"flag_bad_ending_coward", "ending_coward"}
     };
     for (const auto& mapping : endingFlags)
         if (world.hasFlag(mapping.first)) unlockEnding(mapping.second, world);
@@ -123,7 +130,8 @@ void CollectionSystem::syncLegacyFlags(WorldState& world) const {
         {"flag_achievement_doudou_bond", "achievement_doudou_bond"},
         {"flag_achievement_no_rice", "achievement_no_rice"},
         {"flag_achievement_next_line_after_forest_fire", "achievement_next_line_after_forest_fire"},
-        {"flag_achievement_no_monkey_at_tree", "achievement_no_monkey_at_tree"}
+        {"flag_achievement_no_monkey_at_tree", "achievement_no_monkey_at_tree"},
+        {"flag_achievement_last_season", "achievement_last_season"}
     };
     for (const auto& mapping : achievementFlags)
         if (world.hasFlag(mapping.first)) unlockAchievement(mapping.second, world);

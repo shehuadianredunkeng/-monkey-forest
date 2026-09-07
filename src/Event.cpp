@@ -13,6 +13,6 @@ std::string Event::formatPrompt() const {
     for (std::size_t i = 0; i < choices.size(); ++i) {
         output << (i + 1) << ". " << choices[i] << '\n';
     }
-    output << "请直接按数字键选择（1 / 2 / 3）。";
+    output << "请直接按数字键选择（1 - " << choices.size() << "）。";
     return output.str();
 }

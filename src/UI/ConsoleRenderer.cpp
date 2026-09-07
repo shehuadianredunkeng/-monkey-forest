@@ -218,11 +218,12 @@ ConsoleRenderer::ConsoleRenderer(std::unique_ptr<ConsoleSurface> surface) : surf
     if (!surface_) throw std::invalid_argument("Console surface is required");
 }
 ConsoleRenderer::~ConsoleRenderer() { restore(); }
-bool ConsoleRenderer::beginFrame() {
+bool ConsoleRenderer::beginFrame(bool clearScreen) {
     frameReady_ = surface_->prepare();
     if (frameReady_) {
         surface_->cursor(1, 1, false);
-        surface_->clear({0, 0, UI_WIDTH, UI_HEIGHT - 1});
+        if (clearScreen)
+            surface_->clear({0, 0, UI_WIDTH, UI_HEIGHT - 1});
     }
     return frameReady_;
 }

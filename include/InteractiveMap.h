@@ -14,7 +14,10 @@ enum class InteractionKind {
     Chest,
     Enemy,
     Quest,
-    EasterEgg
+    EasterEgg,
+    LockedDoor,
+    LockedItem,
+    RandomEvent
 };
 
 struct MapInteraction {
@@ -89,6 +92,17 @@ private:
     bool npcVisible(const std::string& npcId, const GameContext& ctx) const;
     bool itemVisible(const std::string& itemId, const GameContext& ctx) const;
     bool enemyVisible(const std::string& enemyId, const GameContext& ctx) const;
+    bool doorLocked(const std::string& direction,
+                    const GameContext& ctx) const;
+    MapInteraction dynamicEnemyAt(Point point,
+                                  const GameContext& ctx) const;
+    MapInteraction seasonalGuardianAt(Point point,
+                                      const GameContext& ctx) const;
+    MapInteraction randomEventAt(Point point,
+                                 const GameContext& ctx) const;
+    MapInteraction companionAt(Point point,
+                               const GameContext& ctx) const;
+    std::vector<Point> dynamicPoints(const GameContext& ctx) const;
     MapInteraction interactionAt(Point point, const GameContext& ctx) const;
     Point spawnAfterTransition(const Definition& target,
                                const std::string& direction) const;

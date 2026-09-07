@@ -14,6 +14,17 @@ constexpr const char* kEscapeSkill = "flag_skill_escape_unlocked";
 constexpr const char* kChildQuest = "flag_child_rescued";
 constexpr const char* kHealerQuest = "flag_healer_supplied";
 constexpr const char* kKingSupport = "flag_king_support";
+
+int yearForStage(int stage) {
+    return stage <= 2 ? 1 : (stage <= 4 ? 2 : 3);
+}
+
+int escapeCount(const WorldState& world) {
+    int count = 0;
+    for (int i = 1; i <= 7; ++i)
+        if (world.hasFlag("flag_escape_count_" + std::to_string(i))) count = i;
+    return count;
+}
 }
 
 void NPCSystem::initializeNPCs() {
@@ -72,7 +83,15 @@ ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
         }
     } else if (id == "npc_scout") {
         if (ctx.world.hasFlag(kScoutQuest)) {
-            text = "闪尾：嘿！有事喊哥。真打不过就用“逃跑（escape）”，哥带你走！";
+            const int year = yearForStage(ctx.world.getStage());
+            if (year == 1)
+                text = "闪尾：第一年跟着哥混得还习惯吧？风向不对就别硬撑，真打不过就用“逃跑（escape）”，哥从树顶接你。";
+            else if (year == 2)
+                text = "闪尾：都搭档两年了，你一皱眉哥就知道哪儿有埋伏。只是逃跑也得有个度，家园总要有人回头守住。";
+            else
+                text = escapeCount(ctx.world) >= 4
+                    ? "闪尾：第三年了，咱们一起荡过的藤蔓比别人走过的路还多。你真想离开时，哥说过的话依然算数。"
+                    : "闪尾：第三年可不能再把你当小猴儿了。等打完赫兹，答应哥，咱们去最高的树冠看一次日出。";
         } else if (!ctx.world.hasFlag(kScoutMet)) {
             ctx.world.setFlag(kScoutMet);
             text = "闪尾主动和你打招呼：嘿！小猴儿，有什么需要帮忙的找哥就是了，哥罩着你！\n"
@@ -142,7 +161,7 @@ ActionResult NPCSystem::chooseNPCDialogue(const std::string& npcId,
             CollectionSystem().unlockAchievement(
                 "achievement_no_rice", ctx.world);
             return {false,
-                    "没有草药，无法处理伤口。隐藏成就解锁：巧妇难为无米之炊！\n"
+                    "没有草药，无法处理伤口。\n【成就解锁】巧妇难为无米之炊！\n"
                     "请选择 3 暂时离开，并去河谷附近寻找草药。",
                     false, false};
         }

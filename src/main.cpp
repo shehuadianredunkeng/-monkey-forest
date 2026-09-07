@@ -100,6 +100,32 @@ bool hasPendingMainChoice(const WorldState& world) {
     return false;
 }
 
+bool hasAllSeasonalRelics(const WorldState& world) {
+    return world.hasFlag("flag_season_relic_spring") &&
+           world.hasFlag("flag_season_relic_summer") &&
+           world.hasFlag("flag_season_relic_autumn") &&
+           world.hasFlag("flag_season_relic_winter");
+}
+
+std::string seasonName(int turn) {
+    static const char* names[] = {"春", "夏", "秋", "冬"};
+    return names[(turn / 6) % 4];
+}
+
+bool hasAnyFinalRoute(const GameContext& ctx) {
+    const bool resist = ctx.world.hasFlag("flag_route_resist_ready") &&
+        ctx.player.getReputation() >= 60 &&
+        ctx.player.getSkillLevel(SkillType::Combat) >= 2;
+    const bool hack = ctx.world.hasFlag("flag_route_hack_ready") &&
+        ctx.player.getWisdom() >= 4 &&
+        ctx.world.hasFlag("flag_complete_log");
+    const bool migrate = ctx.world.hasFlag("flag_route_migrate_ready") &&
+        ctx.world.getResource(ResourceType::MigrationSupply) >= 8 &&
+        ctx.player.getSkillLevel(SkillType::Leadership) >= 2 &&
+        ctx.world.hasFlag("flag_new_home_found");
+    return resist || hack || migrate || hasAllSeasonalRelics(ctx.world);
+}
+
 std::string objective(const GameContext& ctx) {
     if (ctx.world.hasFlag("flag_pending_scout_wander_choice"))
         return "闪尾正在等待答复：直接按 1 接受，或按 2 拒绝。";
@@ -168,6 +194,21 @@ ActionResult findEasterEgg(const std::string& eggId, GameContext& ctx) {
     const std::string flag = "flag_found_" + eggId;
     if (ctx.world.hasFlag(flag)) return result(false, "这里的秘密已经被发现了。");
     ctx.world.setFlag(flag);
+    if (eggId.rfind("season_relic_", 0) == 0) {
+        const std::string season = eggId.substr(std::string("season_relic_").size());
+        std::string name = season == "spring" ? "春花" :
+                           season == "summer" ? "蝉蜕" :
+                           season == "autumn" ? "秋叶" : "落雪";
+        ctx.world.setFlag("flag_season_relic_" + season);
+        ctx.player.addItem(Item("item_" + season + "_token", name, true, 1));
+        std::string message = "你小心收起黄色光芒中的【" + name + "】，获得一件四季信物。";
+        if (hasAllSeasonalRelics(ctx.world)) {
+            ctx.world.setFlag("flag_achievement_last_season");
+            CollectionSystem().unlockAchievement("achievement_last_season", ctx.world);
+            message += "\n【成就解锁】最后的季节";
+        }
+        return result(true, message, true);
+    }
     if (eggId == "egg_tree_ring") {
         ctx.player.changeSkillLevel(SkillType::Leadership, 1);
         return result(true, "你数清了猴王树年轮中的旧记号。领导技能+1。", true);
@@ -190,6 +231,33 @@ ActionResult findEasterEgg(const std::string& eggId, GameContext& ctx) {
     return result(true, "你按下测试香蕉，训练程序启动。战斗技能+1，生命+20。", true);
 }
 
+ActionResult resolveLocationEvent(const std::string& eventId,
+                                  GameContext& ctx) {
+    const std::string flag = "flag_resolved_" + eventId;
+    if (ctx.world.hasFlag(flag))
+        return result(false, "这处异动已经恢复平静。等待下一回合会出现新的地点事件。");
+    ctx.world.setFlag(flag);
+    const int kind = ctx.world.getTurnCount() % 5;
+    if (kind == 0) {
+        ctx.player.changeStamina(10);
+        return result(true, "你在树根下找到一处避风窝，短暂休息后体力+10。", true);
+    }
+    if (kind == 1) {
+        ctx.player.changeWisdom(1);
+        return result(true, "风吹过石缝发出规律回声，你记下节奏，智慧+1。", true);
+    }
+    if (kind == 2) {
+        ctx.world.changeResource(ResourceType::Food, 1);
+        return result(true, "一群松鼠遗落了坚果，你将它们放进公共储粮，食物+1。", true);
+    }
+    if (kind == 3) {
+        ctx.player.changeHealth(8);
+        return result(true, "你发现一小片清凉苔藓，敷在伤口上，生命+8。", true);
+    }
+    ctx.player.changeReputation(2);
+    return result(true, "你顺手扶起被风吹倒的路标，路过的吗喽向你致谢，声望+2。", true);
+}
+
 std::string battleHelp() {
     return "战斗仍使用短指令：\n"
            "攻击（attack）  防御（guard）  偷窃（steal）\n"
@@ -205,8 +273,9 @@ std::string gameHelp() {
            "I：查看背包    U：输入名称使用物品\n"
            "P：选择存档位保存    Esc：暂停菜单\n\n"
            "【地图图例】\n"
-           "猴=玩家  友=NPC  物=物品  宝=宝箱  敌=战斗  ！=关键剧情\n"
-           "走到青色的“门”会切换房间。剧情和NPC选项出现后，直接按1/2/3。\n\n" +
+           "猴=玩家  友/伴=NPC  物=物品  宝=宝箱  敌=战斗  ！=关键剧情\n"
+           "青色“门”可切换房间，红色“锁”表示尚未满足通行条件，“奇”是本回合地点事件。\n"
+           "剧情和NPC选项出现后，直接按1/2/3/4。\n\n" +
            battleHelp();
 }
 
@@ -220,19 +289,25 @@ std::string specialEndingId(const GameContext& ctx,
         return "ending_second_banana";
     if (ctx.world.hasFlag("flag_bad_ending_gluttony"))
         return "ending_gluttony";
+    if (ctx.world.hasFlag("flag_bad_ending_coward"))
+        return "ending_coward";
+    if (ctx.world.hasFlag("flag_hidden_ending_earth_gift"))
+        return "ending_earth_gift";
+    if (ctx.world.hasFlag("flag_normal_ending_not_hero"))
+        return "ending_not_hero";
     if (ctx.player.getHealth() <= 0) return "ending_fail";
     return endings.determineEndingId(ctx);
 }
 
 std::string endingText(const std::string& id, const EventSystem& events) {
     if (id == "ending_together_forever")
-        return "【隐藏结局：双宿双飞】\n你与闪尾抓住同一根藤蔓，越过河谷，也越过了青木谷的边界。";
+        return "【隐藏结局：双宿双飞】\n你最终握住的不是武器，而是闪尾从树冠垂下的藤蔓。你们没有回头接受岩背准备好的庆功果，也没有等族群替你写下英雄的名字。夜风把青木谷的灯火推到身后，闪尾在前方笑着喊你跟紧一点，你第一次发现离开并不等于逃跑。一路上，你们替陌生猴群赶走盗果的山魈，在雨林深处交换各自没有讲完的故事，也会为了最后一根巴拿拿争得面红耳赤。多年以后，猴王树仍偶尔收到没有署名的叶片，上面画着两条并肩荡向远方的尾巴。你没有成为家园传说里的英雄，却找到了愿意与你共享危险、食物与明天的同伴。青木谷查无此猴，而世界的每片树冠，都可能留下你们经过的影子。";
     if (id == "ending_forest_fire")
-        return "【隐藏结局：放火烧山】\n火光照亮了整片森林，也照亮了你来不及后悔的脸。";
+        return "【隐藏结局：放火烧山】\n最初只是一粒不起眼的火星。你以为火焰会像战斗指令一样听话，烧到敌人脚下便乖乖停住，可干燥的落叶替它选择了完全不同的方向。风越过果实森林，把红光送上猴王树；河谷里的动物仓皇奔逃，赫兹的机器也在浓烟里失去轮廓。你抱着仅存的水罐站在灰烬边，终于明白力量如果没有判断，就会把想守护的一切变成代价。族群活了下来，却再也无法回到熟悉的枝头。往后的迁徙途中，没有谁责骂你，沉默反而比责骂更重。每当夜里点起篝火，你都会坐到最远处看守，生怕又有一粒火星越过石圈。放火烧山的下一句不再是玩笑，而是你用余生记住的警告。";
     if (id == "ending_second_banana")
-        return "【坏结局：有了第一次就有第二次！】\n你一次次伸手，最终再也没能从香蕉诱惑里醒来。";
+        return "【坏结局：有了第一次就有第二次！】\n你明明已经说出“不吃了”，手却比意志更快地伸向下一根巴拿拿。赫兹没有催促，只把金黄的果实一根根摆在面前，像是在验证一条早已写进报告的结论：守护者也可以被最简单的欲望拖住。远处传来抽取塔启动的震动，你告诉自己再吃一口就回去，再休息一会儿就反击，可每一次让步都替下一次找好了理由。等盘子终于空了，清泉已经停止流动，猴王树的叶片也蒙上一层灰白。你没有输给更强的武器，而是输给那个不断替自己宽限的念头。后来族群谈起这场失败，总会提醒幼猴：真正危险的从来不是第一根香蕉，而是相信第二次仍然可以随时停下。";
     if (id == "ending_gluttony")
-        return "【坏结局：你犯下了暴食罪！】\n赫兹放下最后一根香蕉，抽取塔继续轰鸣。";
+        return "【坏结局：你犯下了暴食罪！】\n赫兹每递来一根巴拿拿，你都听见同伴在身后呼喊；可香甜的气味盖过警报，也盖过你曾经说过的誓言。你机械地咀嚼，任由一次次攻击落在身上，还安慰自己吃饱以后会更有力气。最后一根香蕉落地时，你已经无力伸手，抽取塔的轰鸣却比任何时候都清晰。赫兹收起记录板，没有嘲笑，只平静地把“无法抵抗即时奖励”写进观察结论。猴群被迫离开枯竭的河谷，而你的名字成了一个带着苦味的故事：拥有力量却不懂节制，拥有目标却被眼前满足牵走。森林没有审判你，季节仍旧轮转；真正的惩罚，是你再也看不到下一次春花开放。";
     return events.getEndingText(id);
 }
 
@@ -314,16 +389,26 @@ GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
     ui.appendLog(events.getStageIntroduction(ctx.world.getStage()));
     ui.appendLog(roomArrival(ctx));
     ui.appendLog("用WASD行走；靠近彩色目标后按Enter或空格互动。");
+    int announcedTurn = -1;
 
     while (true) {
         map.ensureCurrentRoom(ctx);
         updateProfile(ctx, profile, collections);
+        if (!combat.isInBattle() && announcedTurn != ctx.world.getTurnCount()) {
+            announcedTurn = ctx.world.getTurnCount();
+            ui.appendLog("【第" + std::to_string(announcedTurn) + "回合·" +
+                         seasonName(announcedTurn) +
+                         "季】地图上的游荡敌人与青色“奇”地点已经刷新。每个季节持续6回合。");
+        }
         const bool ended = ctx.player.getHealth() <= 0 ||
             ctx.world.hasFlag("flag_final_choice") ||
             ctx.world.hasFlag("flag_hidden_ending_together_forever") ||
             ctx.world.hasFlag("flag_bad_ending_forest_fire") ||
             ctx.world.hasFlag("flag_bad_ending_second_banana") ||
-            ctx.world.hasFlag("flag_bad_ending_gluttony");
+            ctx.world.hasFlag("flag_bad_ending_gluttony") ||
+            ctx.world.hasFlag("flag_bad_ending_coward") ||
+            ctx.world.hasFlag("flag_hidden_ending_earth_gift") ||
+            ctx.world.hasFlag("flag_normal_ending_not_hero");
         if (ended) {
             const std::string id = specialEndingId(ctx, endings);
             collections.unlockEnding(id, ctx.world);
@@ -358,6 +443,8 @@ GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
             if (moved.roomChanged) {
                 applyResult(moved.action, ctx, progress, events, ui);
                 ui.appendLog(roomArrival(ctx));
+            } else if (!moved.action.message.empty()) {
+                ui.appendLog(moved.action.message);
             }
             continue;
         }
@@ -382,9 +469,29 @@ GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
                 outcome = combat.startBattle(interaction.id, ctx);
                 break;
             case InteractionKind::Quest:
-                outcome = events.triggerAvailableMainEvent(ctx);
+                if (ctx.world.getStage() == 6 &&
+                    !hasPendingMainChoice(ctx.world) &&
+                    !hasAnyFinalRoute(ctx)) {
+                    ctx.world.setFlag("flag_normal_ending_not_hero");
+                    ctx.world.setFlag("flag_final_choice");
+                    outcome = result(true,
+                        "你检查了所有准备，却发现没有一条英雄路线能够成立。\n"
+                        "【结局达成】你不是英雄", true, true);
+                } else {
+                    outcome = events.triggerAvailableMainEvent(ctx);
+                }
                 if (!outcome.success && outcome.message.empty())
                     outcome = result(false, "这个任务点暂时没有新的剧情。先查看右侧目标。");
+                break;
+            case InteractionKind::LockedDoor:
+                outcome = result(false,
+                    "【无法解锁】实验基地门禁仍是红色。需要先取得基地线索，推进至第四阶段并在猴王树平息猴群分歧。");
+                break;
+            case InteractionKind::LockedItem:
+                outcome = result(false, "【暂时无法拾取】" + interaction.hint + "。");
+                break;
+            case InteractionKind::RandomEvent:
+                outcome = resolveLocationEvent(interaction.id, ctx);
                 break;
             default:
                 outcome = result(false, "附近没有可互动目标。面向目标再按一次Enter。");
@@ -397,9 +504,11 @@ GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
 
         if (action == UI::ExploreAction::Choice1 ||
             action == UI::ExploreAction::Choice2 ||
-            action == UI::ExploreAction::Choice3) {
+            action == UI::ExploreAction::Choice3 ||
+            action == UI::ExploreAction::Choice4) {
             const int option = action == UI::ExploreAction::Choice1 ? 1 :
-                               action == UI::ExploreAction::Choice2 ? 2 : 3;
+                               action == UI::ExploreAction::Choice2 ? 2 :
+                               action == UI::ExploreAction::Choice3 ? 3 : 4;
             ActionResult choice;
             if (ctx.world.hasFlag("flag_pending_scout_wander_choice"))
                 choice = combat.chooseEscapeEndingOption(option, ctx);

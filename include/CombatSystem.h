@@ -9,6 +9,7 @@
 struct BattleState {
     bool inBattle = false;
     std::string enemyId;
+    std::string encounterId;
     int enemyHealth = 0;
     bool playerGuarding = false;
     bool awaitingBananaChoice = false;

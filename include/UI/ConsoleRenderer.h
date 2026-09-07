@@ -22,13 +22,15 @@ enum class Color : std::uint16_t {
     Error = 12,
     Wall = 8,
     Player = 15,
-    Npc = 13,
+    Npc = 14,
     Item = 14,
     Quest = 12,
     Door = 11,
-    Chest = 6,
+    Chest = 14,
     Water = 9,
-    Grass = 2
+    Grass = 2,
+    Achievement = 13,
+    Ending = 10
 };
 struct Rect { SHORT left; SHORT top; SHORT right; SHORT bottom; };
 enum class Key { Text, Enter, Backspace, Delete, Left, Right, Up, Down,
@@ -53,7 +55,7 @@ public:
     ConsoleRenderer();
     explicit ConsoleRenderer(std::unique_ptr<ConsoleSurface> surface);
     ~ConsoleRenderer();
-    bool beginFrame();
+    bool beginFrame(bool clearScreen = true);
     void moveCursor(SHORT x, SHORT y);
     void showCursor(SHORT x, SHORT y, bool visible);
     void drawText(SHORT x, SHORT y, std::wstring text, Color color = Color::Normal);

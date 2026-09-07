@@ -27,6 +27,7 @@ enum class ExploreAction {
     Choice1,
     Choice2,
     Choice3,
+    Choice4,
     EndOfInput
 };
 
@@ -58,6 +59,8 @@ private:
 
     ConsoleRenderer& renderer_;
     std::vector<LogLine> history_;
+    std::vector<MapTileVisual> lastMapTiles_;
+    bool needsFullClear_ = true;
 
     void centered(SHORT y, const std::wstring& text, Color color);
     int menu(const std::wstring& title,

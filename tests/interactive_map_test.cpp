@@ -27,6 +27,16 @@ int main() {
                "interactive room dimensions changed");
         expect(map.visualAt(map.playerX(), map.playerY(), ctx).glyph == L"猴",
                "player marker missing");
+        int roamingEnemies = 0;
+        int locationEvents = 0;
+        for (int y = 0; y < map.height(); ++y)
+            for (int x = 0; x < map.width(); ++x) {
+                const std::wstring glyph = map.visualAt(x, y, ctx).glyph;
+                if (glyph == L"敌") ++roamingEnemies;
+                if (glyph == L"奇") ++locationEvents;
+            }
+        expect(roamingEnemies >= 2, "each turn should populate multiple enemies");
+        expect(locationEvents == 1, "each room should expose one turn event");
 
         for (int i = 0; i < 4; ++i) expect(map.move(0, -1, ctx).moved,
                                            "cannot reach tree corridor");
@@ -50,6 +60,25 @@ int main() {
         restored.resetForRoom(ctx);
         expect(restored.playerX() == savedX && restored.playerY() == savedY,
                "saved tile position was not restored");
+
+        Player lockedPlayer;
+        WorldState lockedWorld;
+        lockedPlayer.setCurrentRoomId("room_river");
+        GameContext lockedCtx{lockedPlayer, lockedWorld, rooms};
+        InteractiveMap lockedMap;
+        lockedMap.resetForRoom(lockedCtx);
+        const MapTileVisual lockedDoor = lockedMap.visualAt(35, 7, lockedCtx);
+        expect(lockedDoor.glyph == L"锁" && lockedDoor.color == UI::Color::Error,
+               "locked base door must be visibly red");
+
+        Player cavePlayer;
+        WorldState caveWorld;
+        cavePlayer.setCurrentRoomId("room_cave");
+        GameContext caveCtx{cavePlayer, caveWorld, rooms};
+        InteractiveMap caveMap;
+        caveMap.resetForRoom(caveCtx);
+        expect(caveMap.visualAt(35, 7, caveCtx).glyph != L"门",
+               "dead-end cave door should not be drawn");
 
         std::cout << "interactive_map_test passed\n";
         return 0;

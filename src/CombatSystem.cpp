@@ -12,11 +12,74 @@
 #include <string>
 
 namespace {
+std::string baseEnemyId(const std::string& id) {
+    const std::size_t separator = id.find('@');
+    return separator == std::string::npos ? id : id.substr(0, separator);
+}
+
+std::string safeFlagPart(std::string text) {
+    std::replace(text.begin(), text.end(), '@', '_');
+    return text;
+}
+
 std::string defeatedFlag(const std::string& id) {
+    if (id.find('@') != std::string::npos)
+        return "flag_enemy_defeated_" + safeFlagPart(id);
     if (id == "enemy_bees") return "flag_bees_defeated";
     if (id == "enemy_robot") return "flag_robot_defeated";
     if (id == "enemy_hertz") return "flag_hertz_defeated";
     return "";
+}
+
+void resetTheftStreak(WorldState& world) {
+    world.removeFlag("flag_theft_streak_1");
+    world.removeFlag("flag_theft_streak_2");
+}
+
+int escapeCount(const WorldState& world) {
+    int count = 0;
+    for (int i = 1; i <= 7; ++i)
+        if (world.hasFlag("flag_escape_count_" + std::to_string(i))) count = i;
+    // 兼容试玩版旧存档。
+    if (count == 0 && world.hasFlag("flag_escape_used_1")) count = 1;
+    if (count <= 1 && world.hasFlag("flag_escape_used_2")) count = 2;
+    if (count <= 2 && world.hasFlag("flag_escape_used_3")) count = 3;
+    return count;
+}
+
+std::string seasonalRelicId(const std::string& enemyId) {
+    const std::string prefix = "enemy_season_guardian_";
+    if (enemyId.rfind(prefix, 0) != 0) return "";
+    return enemyId.substr(prefix.size());
+}
+
+std::string relicChinese(const std::string& season) {
+    if (season == "spring") return "春花";
+    if (season == "summer") return "蝉蜕";
+    if (season == "autumn") return "秋叶";
+    return "落雪";
+}
+
+bool allSeasonalRelics(const WorldState& world) {
+    return world.hasFlag("flag_season_relic_spring") &&
+           world.hasFlag("flag_season_relic_summer") &&
+           world.hasFlag("flag_season_relic_autumn") &&
+           world.hasFlag("flag_season_relic_winter");
+}
+
+std::string grantSeasonalRelic(const std::string& season, GameContext& ctx) {
+    const std::string flag = "flag_season_relic_" + season;
+    if (ctx.world.hasFlag(flag)) return "";
+    ctx.world.setFlag(flag);
+    ctx.player.addItem(Item("item_" + season + "_token",
+                            relicChinese(season), true, 1));
+    std::string message = "\n获得四季信物【" + relicChinese(season) + "】。";
+    if (allSeasonalRelics(ctx.world)) {
+        ctx.world.setFlag("flag_achievement_last_season");
+        CollectionSystem().unlockAchievement("achievement_last_season", ctx.world);
+        message += "\n【成就解锁】最后的季节";
+    }
+    return message;
 }
 
 std::string normalizeBattleAction(const std::string& action) {
@@ -57,6 +120,18 @@ void CombatSystem::initializeEnemies() {
         "每隔数回合蓄力射击的机械守卫。", 30, 9, 2, 12});
     enemies_.emplace("enemy_hertz", Enemy{"enemy_hertz", "赫兹",
         "拥有能源护甲的星猿工程官。", 42, 11, 3, 20});
+    enemies_.emplace("enemy_raider", Enemy{"enemy_raider", "流浪山魈",
+        "趁乱在林间搜刮物资的危险来客。", 22, 7, 1, 6});
+    enemies_.emplace("enemy_drone", Enemy{"enemy_drone", "侦察无人机",
+        "沿银色管线巡游的小型星猿机械。", 26, 8, 2, 8});
+    enemies_.emplace("enemy_season_guardian_spring", Enemy{"enemy_season_guardian_spring", "春之守望者",
+        "守护第一朵春花的古老林灵。", 32, 8, 2, 10});
+    enemies_.emplace("enemy_season_guardian_summer", Enemy{"enemy_season_guardian_summer", "夏之守望者",
+        "伴随蝉鸣现身的古老林灵。", 34, 9, 2, 10});
+    enemies_.emplace("enemy_season_guardian_autumn", Enemy{"enemy_season_guardian_autumn", "秋之守望者",
+        "守护最后一枚秋叶的古老林灵。", 36, 9, 3, 11});
+    enemies_.emplace("enemy_season_guardian_winter", Enemy{"enemy_season_guardian_winter", "冬之守望者",
+        "从未融化的落雪中苏醒的古老林灵。", 38, 10, 3, 12});
 }
 
 const Enemy* CombatSystem::currentEnemy() const {
@@ -69,7 +144,8 @@ ActionResult CombatSystem::startBattle(const std::string& enemyId,
     if (enemies_.empty()) initializeEnemies();
     if (battleState_.inBattle)
         return {false, "当前战斗尚未结束。", false, false};
-    const auto it = enemies_.find(enemyId);
+    const std::string baseId = baseEnemyId(enemyId);
+    const auto it = enemies_.find(baseId);
     if (it == enemies_.end())
         return {false, "找不到这个敌人。", false, false};
     const std::string flag = defeatedFlag(enemyId);
@@ -78,14 +154,15 @@ ActionResult CombatSystem::startBattle(const std::string& enemyId,
 
     battleState_ = BattleState{};
     battleState_.inBattle = true;
-    battleState_.enemyId = enemyId;
+    battleState_.enemyId = baseId;
+    battleState_.encounterId = enemyId;
     battleState_.enemyHealth = it->second.getMaxHealth();
     battleTurn_ = 0;
-    enemyArmorActive_ = enemyId == "enemy_hertz";
+    enemyArmorActive_ = baseId == "enemy_hertz";
     std::string hint;
-    if (enemyId == "enemy_bees")
+    if (baseId == "enemy_bees")
         hint = "蜂群怕稳固防守，选择“防御”可以打乱它们。";
-    else if (enemyId == "enemy_robot")
+    else if (baseId == "enemy_robot" || baseId == "enemy_drone")
         hint = "巡逻机每第三回合会蓄力射击；智慧足够时可以尝试“破解”。";
     else if (ctx.world.hasFlag("flag_scout_banana_promise")) {
         battleState_.awaitingBananaChoice = true;
@@ -106,7 +183,7 @@ ActionResult CombatSystem::startBattle(const std::string& enemyId,
     const std::string flintWarning = ctx.player.hasItem("item_flint")
         ? "\n提示：你带着燧石，可输入“使用 燧石（use flint）”发动火攻；有较高风险，建议先存档。"
         : "";
-    const std::string hertzLine = enemyId == "enemy_hertz"
+    const std::string hertzLine = baseId == "enemy_hertz"
         ? "\n赫兹：你们把守护叫作勇气，我把开发叫作进步。让我看看谁能站到最后。"
         : "";
     return {true, "战斗开始：" + it->second.getName() + "，敌方生命" +
@@ -210,9 +287,11 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
     }
     if (command == "analyze") {
         if (battleState_.enemyId != "enemy_hertz")
-            return {false, "这个敌人没有能源护甲可分析。", false, false};
-        if (!ctx.world.hasFlag("flag_complete_log") || ctx.player.getWisdom() < 3)
-            return {false, "需要完整日志且智慧至少3，才能找出护甲弱点。", false, false};
+            return {false, "他没啥可分析的。", false, false};
+        if (ctx.player.getWisdom() < 3)
+            return {false, "你挠了挠头，快把眼珠子瞪出来了也没看出对方有什么弱点。", false, false};
+        if (!ctx.world.hasFlag("flag_complete_log"))
+            return {false, "你看出了机械结构，却缺少完整日志，暂时找不到护甲供能节点。", false, false};
         if (!enemyArmorActive_)
             return {false, "赫兹的能源护甲已经关闭。", false, false};
         ++battleTurn_;
@@ -253,25 +332,37 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
     if (command == "escape") {
         if (!ctx.world.hasFlag("flag_skill_escape_unlocked"))
             return {false, "你还没有解锁“逃跑”。完成闪尾的藤蔓任务后再试。", false, false};
-        if (ctx.world.hasFlag("flag_scout_left"))
-            return {false, "闪尾已经离开队伍，现在没人能带你荡出战场。", false, false};
+        const bool scoutLeft = ctx.world.hasFlag("flag_scout_left");
+        const bool stoleThisBattle = battleState_.theftUsed;
         clearBattle();
-        if (!ctx.world.hasFlag("flag_escape_used_1")) {
-            ctx.world.setFlag("flag_escape_used_1");
-        } else if (!ctx.world.hasFlag("flag_escape_used_2")) {
-            ctx.world.setFlag("flag_escape_used_2");
-        } else if (!ctx.world.hasFlag("flag_escape_used_3")) {
-            ctx.world.setFlag("flag_escape_used_3");
-        } else if (!ctx.world.hasFlag("flag_scout_wander_invitation_resolved")) {
+        if (!stoleThisBattle) resetTheftStreak(ctx.world);
+        const int count = escapeCount(ctx.world) + 1;
+        ctx.world.setFlag("flag_escape_count_" + std::to_string(std::min(count, 7)));
+        if (count == 1) ctx.world.setFlag("flag_escape_used_1");
+        if (count == 2) ctx.world.setFlag("flag_escape_used_2");
+        if (count == 3) ctx.world.setFlag("flag_escape_used_3");
+        if (count >= 7) {
+            ctx.world.setFlag("flag_bad_ending_coward");
+            CollectionSystem().unlockEnding("ending_coward", ctx.world);
+            return {true,
+                    "你第七次转身逃离战场，身后的呼喊渐渐被风吞没。\n"
+                    "【结局达成】你是狗熊",
+                    false, true};
+        }
+        if (count == 4 && !ctx.world.hasFlag("flag_scout_wander_invitation_resolved")) {
             ctx.world.setFlag("flag_pending_scout_wander_choice");
             return {true,
                     "闪尾从天而降，抓起你就荡着藤蔓跑了。\n"
                     "落地后，闪尾忽然认真起来：小猴儿，咱俩配合这么默契，"
                     "干脆别守在这一棵树上了。跟哥一起闯荡天涯，怎么样？\n"
                     "1. 接受\n2. 拒绝\n请直接输入 1 或 2。",
-                    true, false};
+                    false, false};
         }
-        return {true, "闪尾从天而降，抓起你就荡着藤蔓跑了。", true, false};
+        return {true,
+                scoutLeft
+                    ? "你独自沿藤蔓狼狈撤离。敌人仍留在原地，没有凭空消失。"
+                    : "闪尾从天而降，抓起你就荡着藤蔓跑了。敌人仍留在原地。",
+                false, false};
     }
     return {false, "无法识别这个战斗指令。你可以选择：攻击、防御、分析、破解、使用物品或逃跑。",
             false, false};
@@ -336,8 +427,16 @@ ActionResult CombatSystem::handleTheft(GameContext& ctx) {
     const Enemy* enemy = currentEnemy();
     if (!enemy) return {false, "当前没有可以偷窃的目标。", false, false};
     if (battleState_.theftUsed)
-        return {false, "多次偷窃使你良心不安，错失了良机。", false, false};
+        return {false, "他已经一贫如洗了。", false, false};
+    const std::string stolenFlag = "flag_enemy_stolen_" +
+                                   safeFlagPart(battleState_.encounterId);
+    if (ctx.world.hasFlag(stolenFlag)) {
+        return {false, "他已经一贫如洗了。", false, false};
+    }
     battleState_.theftUsed = true;
+    ctx.world.setFlag(stolenFlag);
+    const bool alreadyUnlocked =
+        ctx.world.hasFlag("flag_achievement_monkey_borrow");
     recordTheftAchievement(ctx);
 
     std::string reward;
@@ -349,13 +448,21 @@ ActionResult CombatSystem::handleTheft(GameContext& ctx) {
         ctx.player.addItem(Item("item_material_fragment", "材料碎片"));
         ctx.player.changeStrength(1);
         reward = "你拆下一块材料碎片，力量+1，并获得材料碎片。";
-    } else {
+    } else if (battleState_.enemyId == "enemy_hertz") {
         ctx.player.addItem(Item("item_book", "星猿研究手册"));
         ctx.player.changeWisdom(1);
         reward = "你顺走赫兹的研究手册，智慧+1，并获得星猿研究手册。";
+    } else if (!seasonalRelicId(battleState_.enemyId).empty()) {
+        const std::string season = seasonalRelicId(battleState_.enemyId);
+        reward = "你趁守望者转身，取走了它守护的季节信物。" +
+                 grantSeasonalRelic(season, ctx);
+    } else {
+        ctx.player.addItem(Item("item_wild_supply", "野外补给"));
+        ctx.player.changeStamina(8);
+        reward = "你顺走一份野外补给，体力+8，并获得野外补给。";
     }
-    if (ctx.world.hasFlag("flag_achievement_monkey_borrow"))
-        reward += "隐藏成就解锁：吗喽的事怎么能叫偷呢！";
+    if (!alreadyUnlocked && ctx.world.hasFlag("flag_achievement_monkey_borrow"))
+        reward += "\n【成就解锁】吗喽的事怎么能叫偷呢！";
 
     ++battleTurn_;
     ActionResult result = enemyCounterAttack(ctx, false);
@@ -502,7 +609,9 @@ ActionResult CombatSystem::enemyCounterAttack(GameContext& ctx, bool guarded) {
         ctx.player.changeHealth(2);
     battleState_.playerGuarding = false;
     if (ctx.player.getHealth() <= 0) {
+        const bool stoleThisBattle = battleState_.theftUsed;
         clearBattle();
+        if (!stoleThisBattle) resetTheftStreak(ctx.world);
         return {false, move + "造成" + std::to_string(damage) +
                        "点伤害。你失去了意识。", true, false};
     }
@@ -516,12 +625,22 @@ ActionResult CombatSystem::enemyCounterAttack(GameContext& ctx, bool guarded) {
 
 ActionResult CombatSystem::finishVictory(GameContext& ctx, const Enemy& enemy) {
     ctx.player.changeReputation(enemy.getReputationReward());
-    const std::string flag = defeatedFlag(enemy.getId());
+    const std::string encounterId = battleState_.encounterId.empty()
+        ? enemy.getId() : battleState_.encounterId;
+    const bool stoleThisBattle = battleState_.theftUsed;
+    const std::string season = seasonalRelicId(enemy.getId());
+    const std::string flag = defeatedFlag(encounterId);
     if (!flag.empty()) ctx.world.setFlag(flag);
+    if (!season.empty())
+        ctx.world.setFlag("flag_season_guardian_defeated_" + season);
+    const std::string seasonalReward = season.empty()
+        ? "" : grantSeasonalRelic(season, ctx);
+    if (!stoleThisBattle) resetTheftStreak(ctx.world);
     const int reward = enemy.getReputationReward();
     const std::string name = enemy.getName();
     clearBattle();
-    return {true, "你击败了" + name + "。声望+" + std::to_string(reward) + "。",
+    return {true, "你击败了" + name + "。声望+" + std::to_string(reward) + "。" +
+                  seasonalReward,
             true, false};
 }
 
