@@ -41,6 +41,7 @@ public:
     void resetForRoom(const GameContext& ctx,
                       const std::string& enteredByDirection = "");
     void ensureCurrentRoom(const GameContext& ctx);
+    void storePosition(GameContext& ctx) const;
     MapMoveResult move(int dx, int dy, GameContext& ctx);
     MapInteraction interact(const GameContext& ctx) const;
 

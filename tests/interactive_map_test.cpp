@@ -43,6 +43,13 @@ int main() {
         const MapInteraction scout = map.interact(ctx);
         expect(scout.kind == InteractionKind::Npc && scout.id == "npc_scout",
                "proximity interaction did not find NPC");
+        const int savedX = map.playerX();
+        const int savedY = map.playerY();
+        map.storePosition(ctx);
+        InteractiveMap restored;
+        restored.resetForRoom(ctx);
+        expect(restored.playerX() == savedX && restored.playerY() == savedY,
+               "saved tile position was not restored");
 
         std::cout << "interactive_map_test passed\n";
         return 0;

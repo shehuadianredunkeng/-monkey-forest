@@ -5,6 +5,7 @@
 #include "WorldState.h"
 
 #include <algorithm>
+#include <sstream>
 
 namespace {
 using PointPair = std::pair<int, int>;
@@ -151,11 +152,34 @@ void InteractiveMap::resetForRoom(const GameContext& ctx,
     player_ = enteredByDirection.empty()
                   ? map->start
                   : spawnAfterTransition(*map, enteredByDirection);
+    if (enteredByDirection.empty()) {
+        const std::string prefix = "flag_map_position_" + roomId_ + "_";
+        for (const std::string& flag : ctx.world.getFlags()) {
+            if (flag.rfind(prefix, 0) != 0) continue;
+            std::istringstream encoded(flag.substr(prefix.size()));
+            int x = 0;
+            int y = 0;
+            char separator = 0;
+            if (encoded >> x >> separator >> y && separator == '_' &&
+                x > 0 && y > 0 && x < map->width - 1 && y < map->height - 1 &&
+                map->terrain[y][x] != '#' && map->terrain[y][x] != '~')
+                player_ = {x, y};
+        }
+    }
     facing_ = {1, 0};
 }
 
 void InteractiveMap::ensureCurrentRoom(const GameContext& ctx) {
     if (roomId_ != ctx.player.getCurrentRoomId()) resetForRoom(ctx);
+}
+
+void InteractiveMap::storePosition(GameContext& ctx) const {
+    for (const std::string& flag : ctx.world.getFlags())
+        if (flag.rfind("flag_map_position_", 0) == 0)
+            ctx.world.removeFlag(flag);
+    ctx.world.setFlag("flag_map_position_" + roomId_ + "_" +
+                      std::to_string(player_.x) + "_" +
+                      std::to_string(player_.y));
 }
 
 InteractiveMap::Point InteractiveMap::spawnAfterTransition(

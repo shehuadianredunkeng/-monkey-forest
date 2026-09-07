@@ -432,10 +432,12 @@ GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
         if (action == UI::ExploreAction::Save) {
             const int slot = ui.showSlotMenu(L"选 择 存 档 位",
                                               slotDescriptions(slots), true);
-            if (slot > 0)
+            if (slot > 0) {
+                map.storePosition(ctx);
                 ui.appendLog(slots.save(slot, ctx, saveManager)
                     ? "已保存到存档位" + std::to_string(slot) + "。"
                     : "保存失败，请检查目录权限。");
+            }
             continue;
         }
         if (action == UI::ExploreAction::Menu) {
@@ -443,10 +445,12 @@ GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
             if (paused == 1) {
                 const int slot = ui.showSlotMenu(L"选 择 存 档 位",
                                                   slotDescriptions(slots), true);
-                if (slot > 0)
+                if (slot > 0) {
+                    map.storePosition(ctx);
                     ui.appendLog(slots.save(slot, ctx, saveManager)
                         ? "已保存到存档位" + std::to_string(slot) + "。"
                         : "保存失败，请检查目录权限。");
+                }
             } else if (paused == 2) {
                 return GameExit::Menu;
             }
