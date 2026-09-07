@@ -46,7 +46,7 @@ ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
     if (!findNPC(id)) return {false, "这里没有这个角色。", false, false};
     activeDialogueNpcId_.clear();
 
-    // 玩家只需要持续使用“对话（talk）”：满足条件时自动提交并结算任务。
+    // 玩家靠近后按互动键：满足条件时自动提交并结算任务。
     if (id == "npc_scout" && ctx.world.hasFlag(kScoutChoiceMade) &&
         !ctx.world.hasFlag(kScoutQuest) && ctx.player.hasItem("item_rope"))
         return completeNPCQuest(id, ctx);
@@ -76,7 +76,7 @@ ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
         } else if (!ctx.world.hasFlag(kScoutMet)) {
             ctx.world.setFlag(kScoutMet);
             text = "闪尾主动和你打招呼：嘿！小猴儿，有什么需要帮忙的找哥就是了，哥罩着你！\n"
-                   "再次与闪尾对话即可回应他。";
+                   "再按一次互动键即可回应他。";
         } else if (!ctx.world.hasFlag(kScoutChoiceMade)) {
             activeDialogueNpcId_ = id;
             text = "闪尾：说吧，小猴儿，想让哥怎么帮你？\n"
@@ -85,7 +85,7 @@ ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
                    "请直接输入 1 或 2。";
         } else {
             text = "闪尾：答应哥的藤蔓还没影儿呢。去果实森林找一根能荡的藤蔓吧！\n"
-                   "找到后回来再次与我对话（talk），哥马上教你保命绝活。";
+                   "找到后回来再按互动键，哥马上教你保命绝活。";
         }
     } else if (id == "npc_healer") {
         if (ctx.world.hasFlag(kHealerQuest)) {
@@ -103,7 +103,7 @@ ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
         } else if (!ctx.world.hasFlag("flag_child_found")) {
             ctx.world.setFlag("flag_child_found");
             text = "你在河谷边找到了豆豆。她的腿被划伤，正强忍着眼泪。\n"
-                   "豆豆：我走不动了……你能帮帮我吗？再次与豆豆对话查看办法。";
+                   "豆豆：我走不动了……你能帮帮我吗？再按一次互动键查看办法。";
         } else {
             activeDialogueNpcId_ = id;
             text = "豆豆的伤口还在流血，你准备怎么做？\n"
@@ -165,7 +165,7 @@ ActionResult NPCSystem::chooseNPCDialogue(const std::string& npcId,
     if (id != "npc_scout")
         return {false, "这个角色当前没有对话选项。", false, false};
     if (!ctx.world.hasFlag(kScoutMet))
-        return {false, "请先输入 talk 闪尾（或 talk scout）。", false, false};
+        return {false, "请先靠近闪尾并按互动键。", false, false};
     if (ctx.world.hasFlag(kScoutChoiceMade))
         return {false, "你已经回应过闪尾了。请按约定寻找藤蔓。", false, false};
     if (option != 1 && option != 2)
@@ -176,19 +176,19 @@ ActionResult NPCSystem::chooseNPCDialogue(const std::string& npcId,
         ctx.world.setFlag(kScoutFightRequest);
         return {true,
                 "闪尾：打不过不要紧，你找根能荡的绳儿给我，哥自有办法～\n"
-                "任务更新：前往果实森林寻找藤蔓，取得后回来再次与闪尾对话（talk）。",
+                "任务更新：在果实森林找到藤蔓，取得后回到闪尾身边按互动键。",
                 true, false};
     }
     ctx.world.setFlag(kScoutBananaPromise);
     return {true,
             "闪尾：嘿～这么客气呢，那帮哥找根趁手能荡的藤蔓，有机会哥带你去溜溜！\n"
-            "任务更新：前往果实森林寻找藤蔓，取得后回来再次与闪尾对话（talk）。",
+            "任务更新：在果实森林找到藤蔓，取得后回到闪尾身边按互动键。",
             true, false};
 }
 
 ActionResult NPCSystem::chooseDialogueOption(int option, GameContext& ctx) {
     if (activeDialogueNpcId_.empty())
-        return {false, "当前没有等待选择的对话，请先输入 talk NPC名。", false, false};
+        return {false, "当前没有等待选择的对话，请先与NPC互动。", false, false};
     const std::string npcId = activeDialogueNpcId_;
     ActionResult result = chooseNPCDialogue(npcId, option, ctx);
     if (result.success || option == 3) activeDialogueNpcId_.clear();
@@ -263,7 +263,7 @@ ActionResult NPCSystem::completeNPCQuest(const std::string& npcId,
         if (ctx.world.hasFlag(kChildQuest))
             return {false, "豆豆已经安全回到猴群。", false, false};
         return {false,
-                "豆豆任务现在通过对话完成：输入 talk 豆豆（或 talk child）查看救治选项。",
+                "靠近豆豆并按互动键，即可查看救治选项。",
                 false, false};
     }
     if (id == "npc_king") {

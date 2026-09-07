@@ -149,6 +149,9 @@ public:
                 case VK_DELETE: result.key = Key::Delete; break;
                 case VK_LEFT: result.key = Key::Left; break;
                 case VK_RIGHT: result.key = Key::Right; break;
+                case VK_UP: result.key = Key::Up; break;
+                case VK_DOWN: result.key = Key::Down; break;
+                case VK_ESCAPE: result.key = Key::Escape; break;
                 case VK_HOME: result.key = Key::Home; break;
                 case VK_END: result.key = Key::End; break;
                 case VK_PRIOR: result.key = Key::PageUp; break;

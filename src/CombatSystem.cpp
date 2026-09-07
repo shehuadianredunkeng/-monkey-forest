@@ -93,7 +93,7 @@ ActionResult CombatSystem::startBattle(const std::string& enemyId,
                "1. 把巴拿拿给闪尾\n"
                "2. 把巴拿拿吃了\n"
                "3. 拒绝香蕉【需要智慧≥3】\n"
-               "请输入：香蕉 1/2/3（banana 1/2/3）。";
+               "请直接输入 1、2 或 3（也支持“香蕉 1/2/3”）。";
     } else
         hint = "能源护甲会削弱攻击；读过日志后可以尝试“分析”或“破解”。";
     std::string tutorial;
@@ -139,7 +139,7 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
 
     if (battleState_.awaitingBananaChoice || battleState_.bananaGreedLoop) {
         if (command != "banana")
-            return {false, "赫兹正举着巴拿拿等你选择。请输入“香蕉 1/2/3（banana 1/2/3）”。",
+            return {false, "赫兹正举着巴拿拿等你选择。请直接输入1、2或3。",
                     false, false};
         return handleBananaChoice(target, ctx);
     }

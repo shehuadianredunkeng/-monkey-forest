@@ -15,11 +15,24 @@ constexpr SHORT INPUT_ROW = 27;
 constexpr SHORT REQUIRED_COLUMNS = UI_WIDTH + 1;
 
 enum class Color : std::uint16_t {
-    Normal = 7, Title = 11, Hint = 14, Success = 10, Error = 12
+    Normal = 7,
+    Title = 11,
+    Hint = 14,
+    Success = 10,
+    Error = 12,
+    Wall = 8,
+    Player = 15,
+    Npc = 13,
+    Item = 14,
+    Quest = 12,
+    Door = 11,
+    Chest = 6,
+    Water = 9,
+    Grass = 2
 };
 struct Rect { SHORT left; SHORT top; SHORT right; SHORT bottom; };
-enum class Key { Text, Enter, Backspace, Delete, Left, Right, Home, End,
-                 PageUp, PageDown, Resize, EndOfInput };
+enum class Key { Text, Enter, Backspace, Delete, Left, Right, Up, Down,
+                 Escape, Home, End, PageUp, PageDown, Resize, EndOfInput };
 struct InputEvent { Key key; std::wstring text; };
 
 // Small device boundary: native Win32 console in production, recording device in tests.

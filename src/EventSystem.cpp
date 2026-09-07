@@ -180,8 +180,8 @@ ActionResult EventSystem::triggerEvent(const std::string& eventId,
         return makeResult(false,
                           resolvedId == kRandomRequestId
                               ? "当前地点没有新的随机事件。请前往其他地点继续探索，"
-                                "之后可再次输入“随机（random）”。"
-                              : "没有找到对应事件，请输入“指引（guide）”查看当前主线。");
+                                "之后可继续在地图中寻找闪光点。"
+                              : "没有找到对应事件，请查看右侧当前目标。");
     }
     if (ctx.world.hasFlag(event->pendingFlag())) {
         activeEventId_ = event->eventId;
@@ -214,8 +214,7 @@ ActionResult EventSystem::chooseEventOption(const std::string& eventId,
     const Event* event = findEvent(resolvedId);
     if (event == nullptr) {
         return makeResult(false,
-                          "当前没有等待选择的事件。请到目标地点触发主线，"
-                          "或输入“调查（investigate）”重新查看事件。");
+                          "当前没有等待选择的事件。请前往红色任务点互动。");
     }
     if (!ctx.world.hasFlag(event->pendingFlag())) {
         return makeResult(false,

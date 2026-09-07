@@ -38,6 +38,7 @@ void WorldState::setFlag(const std::string& flag) { worlds[this].flags.insert(fl
 void WorldState::removeFlag(const std::string& flag) { worlds[this].flags.erase(flag); }
 
 void testNpcTasksUsePlayerAndWorldInterfaces() {
+    worlds.clear();
     Player player;
     WorldState world;
     auto rooms = createAllRooms();
@@ -98,6 +99,7 @@ void testNpcTasksUsePlayerAndWorldInterfaces() {
 }
 
 void testRepeatedEscapeEndingAndScoutDeparture() {
+    worlds.clear();
     Player player;
     WorldState world;
     auto rooms = createAllRooms();
@@ -148,6 +150,7 @@ void testRepeatedEscapeEndingAndScoutDeparture() {
 }
 
 void testCollectionSystemSupportsNewAndLegacyEndings() {
+    worlds.clear();
     WorldState world;
     CollectionSystem collections;
     expect(collections.endings().size() == 8, "all current endings must be registered");
@@ -173,6 +176,7 @@ void testCollectionSystemSupportsNewAndLegacyEndings() {
 }
 
 void testTheftAndBeeDefenseAchievements() {
+    worlds.clear();
     Player player;
     WorldState world;
     auto rooms = createAllRooms();
@@ -210,6 +214,7 @@ void testTheftAndBeeDefenseAchievements() {
 }
 
 void testEscapeSkillAndHertzBananaChoice() {
+    worlds.clear();
     Player player;
     WorldState world;
     auto rooms = createAllRooms();
@@ -236,6 +241,7 @@ void testEscapeSkillAndHertzBananaChoice() {
 }
 
 void testHertzBananaBadEndings() {
+    worlds.clear();
     Player player;
     WorldState world;
     auto rooms = createAllRooms();
@@ -254,6 +260,7 @@ void testHertzBananaBadEndings() {
 }
 
 void testRobotHackAndHertzArmor() {
+    worlds.clear();
     Player player;
     WorldState world;
     auto rooms = createAllRooms();
@@ -283,6 +290,7 @@ void testRobotHackAndHertzArmor() {
 }
 
 void testNpcPlacementMatchesQuestFlow() {
+    worlds.clear();
     Player player;
     WorldState world;
     auto rooms = createAllRooms();
