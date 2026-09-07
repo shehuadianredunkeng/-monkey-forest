@@ -271,7 +271,7 @@ std::string gameHelp() {
            "W/A/S/D 或方向键：在房间内移动\n"
            "Enter / 空格：与身边目标互动\n"
            "I：查看背包    U：输入名称使用物品\n"
-           "P：选择存档位保存    Esc：暂停菜单\n\n"
+           "P：选择存档位保存    PgUp/PgDn：翻看以往剧情    Esc：暂停菜单\n\n"
            "【地图图例】\n"
            "猴=玩家  友/伴=NPC  物=物品  宝=宝箱  敌=战斗  ！=关键剧情\n"
            "青色“门”可切换房间，红色“锁”表示尚未满足通行条件，“奇”是本回合地点事件。\n"
@@ -293,6 +293,8 @@ std::string specialEndingId(const GameContext& ctx,
         return "ending_coward";
     if (ctx.world.hasFlag("flag_hidden_ending_earth_gift"))
         return "ending_earth_gift";
+    if (ctx.world.hasFlag("flag_hidden_ending_spark"))
+        return "ending_spark";
     if (ctx.world.hasFlag("flag_normal_ending_not_hero"))
         return "ending_not_hero";
     if (ctx.player.getHealth() <= 0) return "ending_fail";
@@ -408,12 +410,13 @@ GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
             ctx.world.hasFlag("flag_bad_ending_gluttony") ||
             ctx.world.hasFlag("flag_bad_ending_coward") ||
             ctx.world.hasFlag("flag_hidden_ending_earth_gift") ||
+            ctx.world.hasFlag("flag_hidden_ending_spark") ||
             ctx.world.hasFlag("flag_normal_ending_not_hero");
         if (ended) {
             const std::string id = specialEndingId(ctx, endings);
             collections.unlockEnding(id, ctx.world);
             updateProfile(ctx, profile, collections);
-            ui.showTextPage(L"本 轮 结 局", UI::fromUtf8(endingText(id, events)));
+            ui.showEndingCinematic(L"本 轮 结 局", UI::fromUtf8(endingText(id, events)));
             return GameExit::Menu;
         }
 
@@ -472,11 +475,17 @@ GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
                 if (ctx.world.getStage() == 6 &&
                     !hasPendingMainChoice(ctx.world) &&
                     !hasAnyFinalRoute(ctx)) {
-                    ctx.world.setFlag("flag_normal_ending_not_hero");
                     ctx.world.setFlag("flag_final_choice");
+                    const bool spark =
+                        ctx.world.hasFlag("flag_child_rescued") &&
+                        ctx.world.hasFlag("flag_doudou_blessing_triggered");
+                    ctx.world.setFlag(spark ? "flag_hidden_ending_spark"
+                                            : "flag_normal_ending_not_hero");
                     outcome = result(true,
-                        "你检查了所有准备，却发现没有一条英雄路线能够成立。\n"
-                        "【结局达成】你不是英雄", true, true);
+                        "条件判定中……\n" +
+                        std::string(spark ? "【条件判定成功】\n【结局达成】星火"
+                                          : "【条件判定失败】\n【结局达成】绝大多数的现实"),
+                        true, true);
                 } else {
                     outcome = events.triggerAvailableMainEvent(ctx);
                 }

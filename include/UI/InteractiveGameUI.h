@@ -29,6 +29,8 @@ enum class ExploreAction {
     Choice2,
     Choice3,
     Choice4,
+    HistoryUp,
+    HistoryDown,
     EndOfInput
 };
 
@@ -50,6 +52,8 @@ public:
                      const std::vector<std::wstring>& slotDescriptions,
                      bool allowEmpty);
     void showTextPage(const std::wstring& title, const std::wstring& text);
+    void showEndingCinematic(const std::wstring& title,
+                             const std::wstring& text);
     void clearLog();
 
 private:
@@ -62,6 +66,7 @@ private:
     std::vector<LogLine> history_;
     std::vector<MapTileVisual> lastMapTiles_;
     std::map<int, LogLine> lastStableRows_;
+    std::size_t historyScrollBack_ = 0;
     bool needsFullClear_ = true;
 
     void centered(SHORT y, const std::wstring& text, Color color);

@@ -601,6 +601,8 @@ ActionResult CombatSystem::enemyCounterAttack(GameContext& ctx, bool guarded) {
     // 选择沉迷香蕉后必须完整承担该路线后果，豆豆祝福不在此路线中打断结局。
     if (ctx.world.hasFlag("flag_child_rescued") && !battleState_.bananaGreedLoop) {
         const int roll = randomPercent();
+        if (roll <= 26)
+            ctx.world.setFlag("flag_doudou_blessing_triggered");
         if (roll == 1) {
             ctx.world.setFlag("flag_achievement_doudou_bond");
             CollectionSystem().unlockAchievement(

@@ -245,11 +245,11 @@ std::string showInventory(const Player& player)
     const auto& items = player.getInventory().getItems();
     if (items.empty())
     {
-        return "背包 0/8\n背包为空。";
+        return "背包 0/" + std::to_string(Inventory::MAX_SLOTS) + "\n背包为空。";
     }
 
     std::ostringstream output;
-    output << "背包 " << items.size() << "/8";
+    output << "背包 " << items.size() << "/" << Inventory::MAX_SLOTS;
     for (const Item& item : items)
     {
         const auto* info = findItemInfo(item.getId());

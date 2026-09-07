@@ -114,7 +114,7 @@ bool GameUI::render(const GameView& view) {
     renderer_.drawText(RIGHT, 15, L"智慧 WIS: " + std::to_wstring(view.wisdom));
     renderer_.drawText(RIGHT, 16, L"力量 STR: " + std::to_wstring(view.strength));
     renderer_.drawText(RIGHT, 17, L"声望: " + std::to_wstring(view.reputation));
-    renderer_.drawText(RIGHT, 18, L"背包格数: " + std::to_wstring(view.inventorySlots) + L"/8");
+    renderer_.drawText(RIGHT, 18, L"背包格数: " + std::to_wstring(view.inventorySlots) + L"/12");
     renderer_.drawText(RIGHT, 21, L"【快捷命令】", Color::Title);
     renderer_.drawText(RIGHT, 22, L"look"); renderer_.drawText(86, 22, L"go"); renderer_.drawText(98, 22, L"talk");
     renderer_.drawText(RIGHT, 23, L"take"); renderer_.drawText(86, 23, L"bag"); renderer_.drawText(98, 23, L"use");

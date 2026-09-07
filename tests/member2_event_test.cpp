@@ -541,6 +541,13 @@ void testPendingRecoveryAndStoryText() {
     expect(loaded.getEndingText("ending_fail").find("失落之谷") !=
                std::string::npos,
            "failure ending missing");
+    expect(loaded.getEndingText("ending_not_hero").find("绝大多数的现实") !=
+               std::string::npos,
+           "reality ending missing");
+    const std::string spark = loaded.getEndingText("ending_spark");
+    expect(spark.find("星火") != std::string::npos &&
+               spark.find("条件判定成功") != std::string::npos,
+           "spark ending missing");
     for (int stage = 1; stage <= 6; ++stage) {
         const std::string intro = loaded.getStageIntroduction(stage);
         expect(intro.find("event_") == std::string::npos &&

@@ -153,7 +153,7 @@ void testCollectionSystemSupportsNewAndLegacyEndings() {
     worlds.clear();
     WorldState world;
     CollectionSystem collections;
-    expect(collections.endings().size() == 11, "all current endings must be registered");
+    expect(collections.endings().size() == 12, "all current endings must be registered");
     expect(collections.unlockEnding("ending_resist", world),
            "registered main ending should unlock");
     expect(collections.unlockedEndingCount(world) == 1,
@@ -170,9 +170,12 @@ void testCollectionSystemSupportsNewAndLegacyEndings() {
 
     WorldState legacyWorld;
     legacyWorld.setFlag("flag_bad_ending_gluttony");
+    legacyWorld.setFlag("flag_hidden_ending_spark");
     collections.syncLegacyFlags(legacyWorld);
     expect(collections.isEndingUnlocked("ending_gluttony", legacyWorld),
            "old ending flags should be imported");
+    expect(collections.isEndingUnlocked("ending_spark", legacyWorld),
+           "spark ending flag should enter the collection");
 }
 
 void testTheftAndBeeDefenseAchievements() {

@@ -9,6 +9,8 @@
 class Inventory
 {
 public:
+    static constexpr std::size_t MAX_SLOTS = 12;
+
     bool addItem(const Item& item);
 
     bool removeItem(const std::string& itemId);
@@ -20,6 +22,5 @@ public:
     bool isFull() const;
 
 private:
-    static constexpr std::size_t MAX_SLOTS = 8;
     std::vector<Item> items;
 };

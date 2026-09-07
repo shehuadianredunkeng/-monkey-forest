@@ -7,6 +7,8 @@
 #include "WorldState.h"
 
 #include <algorithm>
+#include <chrono>
+#include <thread>
 
 namespace UI {
 namespace {
@@ -85,6 +87,23 @@ void replaceAll(std::wstring& text, const std::wstring& from,
         position += to.size();
     }
 }
+
+std::wstring cinematicSpacing(const std::wstring& text) {
+    std::wstring spaced;
+    spaced.reserve(text.size() + text.size() / 8);
+    const auto punctuation = [](wchar_t ch) {
+        return ch == L'。' || ch == L'！' || ch == L'？';
+    };
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        const wchar_t ch = text[i];
+        spaced.push_back(ch);
+        const bool sentenceEnd = punctuation(ch) ||
+            ((ch == L'”' || ch == L'」') && i > 0 && punctuation(text[i - 1]));
+        if (sentenceEnd && i + 1 < text.size() && text[i + 1] != L'\n')
+            spaced.push_back(L'\n');
+    }
+    return spaced;
+}
 }
 
 InteractiveGameUI::InteractiveGameUI(ConsoleRenderer& renderer)
@@ -107,6 +126,7 @@ void InteractiveGameUI::drawStableLine(Rect area, SHORT y,
 }
 
 void InteractiveGameUI::appendLog(const std::string& text) {
+    historyScrollBack_ = 0;
     std::wstring wide = fromUtf8(text);
     replaceAll(wide, L"隐藏成就解锁：", L"\n【成就解锁】");
     replaceAll(wide, L"隐藏结局：", L"\n【结局达成】");
@@ -156,14 +176,19 @@ bool InteractiveGameUI::render(const GameContext& ctx,
     }
     lastMapTiles_ = std::move(currentTiles);
     renderer_.drawHorizontalLine(18, 0, DIVIDER_X);
-    renderer_.drawText(1, 18, L"+ 剧情记录 ", Color::Title);
+    renderer_.drawText(1, 18,
+                       historyScrollBack_ == 0 ? L"+ 剧情记录 "
+                                               : L"+ 剧情记录（正在回看） ",
+                       Color::Title);
     const std::size_t capacity = LEFT_LOG.bottom - LEFT_LOG.top + 1;
-    const std::size_t first = history_.size() > capacity
-                                  ? history_.size() - capacity
-                                  : 0;
+    const std::size_t maxBack = history_.size() > capacity
+                                    ? history_.size() - capacity : 0;
+    historyScrollBack_ = std::min(historyScrollBack_, maxBack);
+    const std::size_t end = history_.size() - historyScrollBack_;
+    const std::size_t first = end > capacity ? end - capacity : 0;
     for (std::size_t row = 0; row < capacity; ++row) {
         const std::size_t index = first + row;
-        const bool hasLine = index < history_.size();
+        const bool hasLine = index < end;
         drawStableLine(LEFT_LOG, static_cast<SHORT>(LEFT_LOG.top + row),
                        hasLine ? history_[index].text : L"",
                        hasLine ? history_[index].color : Color::Normal);
@@ -204,7 +229,7 @@ bool InteractiveGameUI::render(const GameContext& ctx,
     } else {
         drawStableLine(RIGHT_PANEL, 15, L"背包：" +
                        std::to_wstring(ctx.player.getInventory().getItems().size()) +
-                       L"/8", Color::Normal);
+                       L"/" + std::to_wstring(Inventory::MAX_SLOTS), Color::Normal);
     }
     renderer_.drawText(right, 16, L"【当前目标】", Color::Title);
     const auto objectiveLines = renderer_.wrapText(fromUtf8(objective),
@@ -223,7 +248,7 @@ bool InteractiveGameUI::render(const GameContext& ctx,
     drawStableLine(bottom, 26,
                    combat.isInBattle()
                        ? L"战斗模式：请键入攻击/防御/偷窃/使用/逃跑"
-                       : L"I背包  U使用物品  P存档  H帮助  Esc主菜单",
+                       : L"I背包 U物品 P存档 H帮助 PgUp/PgDn翻剧情 Esc菜单",
                    Color::Hint);
     drawStableLine(bottom, 27, fromUtf8(map.nearbyHint(ctx)), Color::Hint);
     renderer_.drawFrame();
@@ -241,6 +266,15 @@ ExploreAction InteractiveGameUI::readExploreAction() {
         if (event.key == Key::Right) return ExploreAction::MoveRight;
         if (event.key == Key::Enter) return ExploreAction::Interact;
         if (event.key == Key::Escape) return ExploreAction::Menu;
+        if (event.key == Key::PageUp) {
+            historyScrollBack_ += 6;
+            return ExploreAction::HistoryUp;
+        }
+        if (event.key == Key::PageDown) {
+            historyScrollBack_ = historyScrollBack_ > 6
+                                     ? historyScrollBack_ - 6 : 0;
+            return ExploreAction::HistoryDown;
+        }
         if (event.key != Key::Text || event.text.empty()) continue;
         wchar_t key = event.text.front();
         if (key >= L'A' && key <= L'Z') key = key - L'A' + L'a';
@@ -391,13 +425,18 @@ int InteractiveGameUI::showSlotMenu(
 
 void InteractiveGameUI::showTextPage(const std::wstring& title,
                                      const std::wstring& text) {
-    renderer_.beginFrame();
-    centered(2, title, Color::Title);
     const auto lines = renderer_.wrapText(text, UI_WIDTH - 10);
-    for (std::size_t i = 0; i < lines.size() && i < 22; ++i)
-        renderer_.drawText(5, static_cast<SHORT>(5 + i), lines[i],
-                           messageColor(lines[i]));
-    centered(27, L"按Enter、空格或Esc返回", Color::Hint);
+    constexpr std::size_t pageSize = 19;
+    std::size_t offset = 0;
+    const auto draw = [&]() {
+        renderer_.beginFrame();
+        centered(2, title, Color::Title);
+        for (std::size_t i = 0; i < pageSize && offset + i < lines.size(); ++i)
+            renderer_.drawText(5, static_cast<SHORT>(5 + i), lines[offset + i],
+                               messageColor(lines[offset + i]));
+        centered(27, L"↑↓滚动  PgUp/PgDn翻页  Enter/空格/Esc返回", Color::Hint);
+    };
+    draw();
     while (true) {
         const InputEvent event = renderer_.readEvent();
         if (event.key == Key::Enter || event.key == Key::Escape ||
@@ -406,11 +445,75 @@ void InteractiveGameUI::showTextPage(const std::wstring& title,
             needsFullClear_ = true;
             return;
         }
+        const std::size_t maxOffset = lines.size() > pageSize
+                                          ? lines.size() - pageSize : 0;
+        if (event.key == Key::Up && offset > 0) --offset;
+        else if (event.key == Key::Down && offset < maxOffset) ++offset;
+        else if (event.key == Key::PageUp)
+            offset = offset > pageSize ? offset - pageSize : 0;
+        else if (event.key == Key::PageDown)
+            offset = std::min(maxOffset, offset + pageSize);
+        else if (event.key != Key::Resize) continue;
+        draw();
+    }
+}
+
+void InteractiveGameUI::showEndingCinematic(const std::wstring& title,
+                                             const std::wstring& text) {
+    const auto lines = renderer_.wrapText(cinematicSpacing(text), UI_WIDTH - 16);
+    constexpr std::size_t pageSize = 18;
+    std::size_t first = 0;
+    renderer_.beginFrame();
+    centered(2, title, Color::Title);
+    for (std::size_t revealed = 0; revealed < lines.size(); ++revealed) {
+        if (revealed >= first + pageSize) {
+            first = revealed - pageSize + 1;
+            renderer_.beginFrame();
+            centered(2, title, Color::Title);
+            for (std::size_t i = first; i <= revealed; ++i)
+                renderer_.drawText(8, static_cast<SHORT>(5 + i - first), lines[i],
+                                   messageColor(lines[i]));
+        } else {
+            renderer_.drawText(8, static_cast<SHORT>(5 + revealed - first),
+                               lines[revealed], messageColor(lines[revealed]));
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(180));
+    }
+
+    std::size_t offset = first;
+    const auto draw = [&]() {
+        renderer_.beginFrame();
+        centered(2, title, Color::Title);
+        for (std::size_t i = 0; i < pageSize && offset + i < lines.size(); ++i)
+            renderer_.drawText(8, static_cast<SHORT>(5 + i), lines[offset + i],
+                               messageColor(lines[offset + i]));
+        centered(27, L"谢幕完毕 · ↑↓回看 · PgUp/PgDn翻页 · Enter返回", Color::Hint);
+    };
+    draw();
+    while (true) {
+        const InputEvent event = renderer_.readEvent();
+        if (event.key == Key::Enter || event.key == Key::Escape ||
+            event.key == Key::EndOfInput ||
+            (event.key == Key::Text && event.text == L" ")) {
+            needsFullClear_ = true;
+            return;
+        }
+        const std::size_t maxOffset = lines.size() > pageSize
+                                          ? lines.size() - pageSize : 0;
+        if (event.key == Key::Up && offset > 0) --offset;
+        else if (event.key == Key::Down && offset < maxOffset) ++offset;
+        else if (event.key == Key::PageUp)
+            offset = offset > pageSize ? offset - pageSize : 0;
+        else if (event.key == Key::PageDown)
+            offset = std::min(maxOffset, offset + pageSize);
+        else if (event.key != Key::Resize) continue;
+        draw();
     }
 }
 
 void InteractiveGameUI::clearLog() {
     history_.clear();
+    historyScrollBack_ = 0;
     lastStableRows_.clear();
     needsFullClear_ = true;
 }

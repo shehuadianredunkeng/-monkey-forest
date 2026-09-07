@@ -73,7 +73,8 @@ CollectionSystem::CollectionSystem() {
     registerEnding({"ending_gluttony", "你犯下了暴食罪！", "在香蕉诱惑中倒下", true});
     registerEnding({"ending_together_forever", "双宿双飞", "与闪尾闯荡天涯", true});
     registerEnding({"ending_earth_gift", "地球的礼物", "以四季信物唤醒自然之力", true});
-    registerEnding({"ending_not_hero", "你不是英雄", "准备不足时仍要面对选择", false});
+    registerEnding({"ending_not_hero", "绝大多数的现实", "没有任何最终路线能够成立", false});
+    registerEnding({"ending_spark", "星火", "豆豆将被守护的春天传向未来", true});
     registerEnding({"ending_coward", "你是狗熊", "七次逃离守护家园的战斗", true});
 
     registerAchievement({"achievement_monkey_borrow", "吗喽的事怎么能叫偷呢！", "", true});
@@ -119,6 +120,7 @@ void CollectionSystem::syncLegacyFlags(WorldState& world) const {
         {"flag_hidden_ending_together_forever", "ending_together_forever"},
         {"flag_hidden_ending_earth_gift", "ending_earth_gift"},
         {"flag_normal_ending_not_hero", "ending_not_hero"},
+        {"flag_hidden_ending_spark", "ending_spark"},
         {"flag_bad_ending_coward", "ending_coward"}
     };
     for (const auto& mapping : endingFlags)
