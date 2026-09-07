@@ -125,13 +125,13 @@ void CombatSystem::initializeEnemies() {
     enemies_.emplace("enemy_drone", Enemy{"enemy_drone", "侦察无人机",
         "沿银色管线巡游的小型星猿机械。", 26, 8, 2, 8});
     enemies_.emplace("enemy_season_guardian_spring", Enemy{"enemy_season_guardian_spring", "春之守望者",
-        "守护第一朵春花的古老林灵。", 32, 8, 2, 10});
+        "守护第一朵春花的古老林灵。", 38, 8, 2, 12});
     enemies_.emplace("enemy_season_guardian_summer", Enemy{"enemy_season_guardian_summer", "夏之守望者",
-        "伴随蝉鸣现身的古老林灵。", 34, 9, 2, 10});
+        "伴随蝉鸣现身的古老林灵。", 42, 9, 2, 13});
     enemies_.emplace("enemy_season_guardian_autumn", Enemy{"enemy_season_guardian_autumn", "秋之守望者",
-        "守护最后一枚秋叶的古老林灵。", 36, 9, 3, 11});
+        "守护最后一枚秋叶的古老林灵。", 46, 10, 3, 14});
     enemies_.emplace("enemy_season_guardian_winter", Enemy{"enemy_season_guardian_winter", "冬之守望者",
-        "从未融化的落雪中苏醒的古老林灵。", 38, 10, 3, 12});
+        "从未融化的落雪中苏醒的古老林灵。", 50, 11, 3, 15});
 }
 
 const Enemy* CombatSystem::currentEnemy() const {
@@ -164,21 +164,30 @@ ActionResult CombatSystem::startBattle(const std::string& enemyId,
         hint = "蜂群怕稳固防守，选择“防御”可以打乱它们。";
     else if (baseId == "enemy_robot" || baseId == "enemy_drone")
         hint = "巡逻机每第三回合会蓄力射击；智慧足够时可以尝试“破解”。";
-    else if (ctx.world.hasFlag("flag_scout_banana_promise")) {
+    else if (baseId == "enemy_hertz" &&
+             ctx.world.hasFlag("flag_scout_banana_promise")) {
         battleState_.awaitingBananaChoice = true;
         hint = "赫兹忽然递来一根巴拿拿。\n"
                "1. 把巴拿拿给闪尾\n"
                "2. 把巴拿拿吃了\n"
                "3. 拒绝香蕉【需要智慧≥3】\n"
                "请直接输入 1、2 或 3（也支持“香蕉 1/2/3”）。";
-    } else
+    } else if (baseId == "enemy_hertz")
         hint = "能源护甲会削弱攻击；读过日志后可以尝试“分析”或“破解”。";
+    else if (!seasonalRelicId(baseId).empty())
+        hint = "四季守望者更耐打，每第三回合会释放季节强击。\n"
+               "建议适时防御、补充生命，并先提升战斗或智慧。";
+    else
+        hint = "观察敌人的行动，灵活使用攻击、防御、偷窃和物品。";
     std::string tutorial;
     if (!ctx.world.hasFlag("flag_combat_tutorial_seen")) {
         ctx.world.setFlag("flag_combat_tutorial_seen");
-        tutorial = "\n【首次战斗教学】攻击（attack）造成伤害；防御（guard）降低伤害；"
-                   "偷窃（steal）每场限一次；背包（inventory）查看物品；"
-                   "完成闪尾任务后可使用逃跑（escape）。特殊战斗会另行显示分析、破解等选项。\n";
+        tutorial = "\n【首次战斗教学】\n"
+                   "- 攻击（attack）：对敌人造成伤害。\n"
+                   "- 防御（guard）：降低本回合受到的伤害。\n"
+                   "- 偷窃（steal）：每名敌人只能成功一次。\n"
+                   "- 背包（inventory）：查看可用物品。\n"
+                   "- 逃跑（escape）：完成闪尾任务后解锁。\n";
     }
     const std::string flintWarning = ctx.player.hasItem("item_flint")
         ? "\n提示：你带着燧石，可输入“使用 燧石（use flint）”发动火攻；有较高风险，建议先存档。"
@@ -186,8 +195,8 @@ ActionResult CombatSystem::startBattle(const std::string& enemyId,
     const std::string hertzLine = baseId == "enemy_hertz"
         ? "\n赫兹：你们把守护叫作勇气，我把开发叫作进步。让我看看谁能站到最后。"
         : "";
-    return {true, "战斗开始：" + it->second.getName() + "，敌方生命" +
-                  std::to_string(battleState_.enemyHealth) + "。" + tutorial + hint +
+    return {true, "【战斗开始】" + it->second.getName() + "\n敌方生命：" +
+                  std::to_string(battleState_.enemyHealth) + tutorial + "\n" + hint +
                   flintWarning + hertzLine,
             false, false};
 }
@@ -239,14 +248,19 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
             followUp = randomScoutFollowUp();
             if (battleState_.enemyHealth == 0) {
                 ActionResult victory = finishVictory(ctx, *enemy);
-                victory.message = blessing + "你造成" + std::to_string(damage) + "点伤害。" +
-                                  followUp + victory.message;
+                victory.message = blessing + (blessing.empty() ? "" : "\n") +
+                                  "你造成" + std::to_string(damage) + "点伤害。" +
+                                  (followUp.empty() ? "" : "\n" + followUp) +
+                                  "\n" + victory.message;
                 return victory;
             }
         }
         ActionResult result = enemyCounterAttack(ctx, false);
-        result.message = blessing + "你造成" + std::to_string(damage) + "点伤害。" + followUp +
-            (enemyArmorActive_ ? "能源护甲吸收了大部分冲击。" : "") + result.message;
+        result.message = blessing + (blessing.empty() ? "" : "\n") +
+            "你造成" + std::to_string(damage) + "点伤害。" +
+            (followUp.empty() ? "" : "\n" + followUp) +
+            (enemyArmorActive_ ? "\n能源护甲吸收了大部分冲击。" : "") +
+            "\n" + result.message;
         return result;
     }
     if (command == "guard") {
@@ -276,7 +290,9 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
         const bool guardWorks = battleState_.enemyId != "enemy_bees" ||
                                 battleState_.consecutiveGuards <= 2;
         ActionResult result = enemyCounterAttack(ctx, guardWorks);
-        result.message = "你稳住重心摆出防御姿态。" + guardText + result.message;
+        result.message = "你稳住重心摆出防御姿态。" +
+                         (guardText.empty() ? "" : "\n" + guardText) +
+                         "\n" + result.message;
         return result;
     }
     if (command == "steal") return handleTheft(ctx);
@@ -297,7 +313,7 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
         ++battleTurn_;
         enemyArmorActive_ = false;
         ActionResult result = enemyCounterAttack(ctx, false);
-        result.message = "你根据日志切断护甲供能。" + result.message;
+        result.message = "你根据日志切断护甲供能。\n" + result.message;
         return result;
     }
     if (command == "hack") {
@@ -315,7 +331,8 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
         battleState_.enemyHealth = std::max(0, battleState_.enemyHealth - damage);
         if (battleState_.enemyHealth == 0) return finishVictory(ctx, *enemy);
         ActionResult result = enemyCounterAttack(ctx, false);
-        result.message = "破解成功，造成" + std::to_string(damage) + "点伤害。" + result.message;
+        result.message = "破解成功，造成" + std::to_string(damage) +
+                         "点伤害。\n" + result.message;
         return result;
     }
     if (command == "use") {
@@ -326,7 +343,7 @@ ActionResult CombatSystem::performBattleAction(const std::string& action,
         if (!used.success) return used;
         ++battleTurn_;
         ActionResult result = enemyCounterAttack(ctx, false);
-        result.message = used.message + result.message;
+        result.message = used.message + "\n" + result.message;
         return result;
     }
     if (command == "escape") {
@@ -433,6 +450,16 @@ ActionResult CombatSystem::handleTheft(GameContext& ctx) {
     if (ctx.world.hasFlag(stolenFlag)) {
         return {false, "他已经一贫如洗了。", false, false};
     }
+    const bool seasonalGuardian = !seasonalRelicId(battleState_.enemyId).empty();
+    if (seasonalGuardian && ctx.player.getWisdom() < 2 &&
+        ctx.player.getSkillLevel(SkillType::Combat) < 2) {
+        ++battleTurn_;
+        ActionResult result = enemyCounterAttack(ctx, false);
+        result.message = "守望者早有防备，你没能碰到季节信物。\n"
+                         "需要智慧达到2级，或战斗技能达到2级。\n" +
+                         result.message;
+        return result;
+    }
     battleState_.theftUsed = true;
     ctx.world.setFlag(stolenFlag);
     const bool alreadyUnlocked =
@@ -466,7 +493,7 @@ ActionResult CombatSystem::handleTheft(GameContext& ctx) {
 
     ++battleTurn_;
     ActionResult result = enemyCounterAttack(ctx, false);
-    result.message = reward + result.message;
+    result.message = reward + "\n" + result.message;
     return result;
 }
 
@@ -497,7 +524,7 @@ ActionResult CombatSystem::handleFlintAttack(GameContext& ctx) {
     battleState_.enemyHealth = std::max(0, battleState_.enemyHealth - 20);
     if (battleState_.enemyHealth == 0) return finishVictory(ctx, *enemy);
     ActionResult result = enemyCounterAttack(ctx, false);
-    result.message = "你用燧石发动火攻，造成20点伤害！" + result.message;
+    result.message = "你用燧石发动火攻，造成20点伤害！\n" + result.message;
     return result;
 }
 
@@ -531,7 +558,7 @@ ActionResult CombatSystem::handleBananaChoice(const std::string& target,
                     "坏结局：你犯下了暴食罪！",
                     true, true};
         }
-        hit.message = "你接过巴拿拿继续吃，赫兹趁机发动攻击。" + hit.message +
+        hit.message = "你接过巴拿拿继续吃，赫兹趁机发动攻击。\n" + hit.message +
                       "\n1. 继续吃　2. 不吃了";
         return hit;
     }
@@ -562,7 +589,7 @@ ActionResult CombatSystem::handleBananaChoice(const std::string& target,
         return {false, "你沉迷巴拿拿，直到倒在赫兹面前。\n坏结局：你犯下了暴食罪！",
                 true, true};
     }
-    hit.message = "你咬下一大口巴拿拿，注意力完全被香甜味道占据。" + hit.message +
+    hit.message = "你咬下一大口巴拿拿，注意力完全被香甜味道占据。\n" + hit.message +
                   "\n赫兹又递来一根：1. 继续吃　2. 不吃了";
     return hit;
 }
@@ -579,8 +606,9 @@ ActionResult CombatSystem::enemyCounterAttack(GameContext& ctx, bool guarded) {
             CollectionSystem().unlockAchievement(
                 "achievement_doudou_bond", ctx.world);
             ActionResult victory = finishVictory(ctx, *enemy);
-            victory.message = "豆豆的神秘祝福化作一道金光，直接击败了对手！"
-                              "隐藏成就解锁：不要小瞧你与豆豆的羁绊啊！" + victory.message;
+            victory.message = "豆豆的神秘祝福化作一道金光，直接击败了对手！\n"
+                              "隐藏成就解锁：不要小瞧你与豆豆的羁绊啊！\n" +
+                              victory.message;
             return victory;
         }
         if (roll <= 6) {
@@ -599,6 +627,22 @@ ActionResult CombatSystem::enemyCounterAttack(GameContext& ctx, bool guarded) {
     } else if (battleState_.enemyId == "enemy_hertz" && battleTurn_ % 3 == 0) {
         attack += 5;
         move = "赫兹释放能源震荡";
+    } else if (!seasonalRelicId(battleState_.enemyId).empty() &&
+               battleTurn_ % 3 == 0) {
+        const std::string season = seasonalRelicId(battleState_.enemyId);
+        if (season == "spring") {
+            attack += 3;
+            move = "春之守望者引爆迷眼花粉";
+        } else if (season == "summer") {
+            attack += 4;
+            move = "夏之守望者掀起灼热蝉鸣";
+        } else if (season == "autumn") {
+            attack += 5;
+            move = "秋之守望者卷起锋利叶刃";
+        } else {
+            attack += 6;
+            move = "冬之守望者释放刺骨霜潮";
+        }
     }
     int damage = std::max(1, attack - ctx.player.getStrength());
     if (ctx.world.hasFlag("flag_scout_help") && !ctx.world.hasFlag("flag_scout_left"))
@@ -612,14 +656,17 @@ ActionResult CombatSystem::enemyCounterAttack(GameContext& ctx, bool guarded) {
         const bool stoleThisBattle = battleState_.theftUsed;
         clearBattle();
         if (!stoleThisBattle) resetTheftStreak(ctx.world);
-        return {false, move + "造成" + std::to_string(damage) +
+        return {false, blessing + (blessing.empty() ? "" : "\n") +
+                       move + "造成" + std::to_string(damage) +
                        "点伤害。你失去了意识。", true, false};
     }
     const std::string heal = ctx.world.hasFlag("flag_healer_supplied")
         ? "叶婆婆的草药让你恢复2点生命。" : "";
-    return {true, blessing + move + "造成" + std::to_string(damage) +
-                  "点伤害；敌方剩余生命" +
-                  std::to_string(battleState_.enemyHealth) + "。" + heal,
+    return {true, blessing + (blessing.empty() ? "" : "\n") +
+                  move + "造成" + std::to_string(damage) + "点伤害。\n" +
+                  "敌方剩余生命：" +
+                  std::to_string(battleState_.enemyHealth) +
+                  (heal.empty() ? "" : "\n" + heal),
             true, false};
 }
 

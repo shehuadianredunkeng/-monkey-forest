@@ -90,6 +90,22 @@ void replaceAll(std::wstring& text, const std::wstring& from,
 InteractiveGameUI::InteractiveGameUI(ConsoleRenderer& renderer)
     : renderer_(renderer) {}
 
+void InteractiveGameUI::drawStableLine(Rect area, SHORT y,
+                                       const std::wstring& text,
+                                       Color color) {
+    const int width = area.right - area.left + 1;
+    std::wstring padded = renderer_.clip(text, width);
+    padded += std::wstring(static_cast<std::size_t>(std::max(
+        0, width - renderer_.columns(padded))), L' ');
+    const int key = static_cast<int>(area.left) * 100 + y;
+    const auto previous = lastStableRows_.find(key);
+    if (previous != lastStableRows_.end() &&
+        previous->second.text == padded && previous->second.color == color)
+        return;
+    renderer_.drawTextIn(area, area.left, y, padded, color);
+    lastStableRows_[key] = {padded, color};
+}
+
 void InteractiveGameUI::appendLog(const std::string& text) {
     std::wstring wide = fromUtf8(text);
     replaceAll(wide, L"隐藏成就解锁：", L"\n【成就解锁】");
@@ -117,6 +133,7 @@ bool InteractiveGameUI::render(const GameContext& ctx,
     const bool fullRedraw = needsFullClear_;
     if (!renderer_.beginFrame(fullRedraw)) return false;
     needsFullClear_ = false;
+    if (fullRedraw) lastStableRows_.clear();
 
     std::wstring mapTitle = L"【" + roomName(ctx) + L"】互动地图";
     const int titlePadding = std::max(0, DIVIDER_X - 2 - renderer_.columns(mapTitle));
@@ -144,70 +161,71 @@ bool InteractiveGameUI::render(const GameContext& ctx,
     const std::size_t first = history_.size() > capacity
                                   ? history_.size() - capacity
                                   : 0;
-    for (std::size_t i = first; i < history_.size(); ++i)
-        renderer_.drawTextIn(
-            LEFT_LOG, LEFT_LOG.left,
-            static_cast<SHORT>(LEFT_LOG.top + i - first),
-            history_[i].text, history_[i].color);
+    for (std::size_t row = 0; row < capacity; ++row) {
+        const std::size_t index = first + row;
+        const bool hasLine = index < history_.size();
+        drawStableLine(LEFT_LOG, static_cast<SHORT>(LEFT_LOG.top + row),
+                       hasLine ? history_[index].text : L"",
+                       hasLine ? history_[index].color : Color::Normal);
+    }
 
     const SHORT right = DIVIDER_X + 2;
     renderer_.drawText(right, 1, L"【小地图】", Color::Title);
     renderer_.drawText(right, 2, L"王--林--河--基", Color::Normal);
     renderer_.drawText(right, 3, L"   |", Color::Wall);
     renderer_.drawText(right, 4, L"   洞", Color::Normal);
-    renderer_.drawText(right, 5,
-                       L"当前位置：" + roomShort(ctx.player.getCurrentRoomId()) +
-                           L" / " + roomName(ctx),
-                       Color::Hint);
+    drawStableLine(RIGHT_PANEL, 5,
+                   L"当前位置：" + roomShort(ctx.player.getCurrentRoomId()) +
+                       L" / " + roomName(ctx), Color::Hint);
     renderer_.drawText(right, 6, L"门=切图  锁=未解锁", Color::Door);
 
     renderer_.drawText(right, 9, L"【状态】", Color::Title);
-    renderer_.drawText(right, 10,
-                       L"生命 " + progressBar(ctx.player.getHealth()),
-                       ctx.player.getHealth() <= 30 ? Color::Error : Color::Success);
-    renderer_.drawText(right, 11,
-                       L"体力 " + progressBar(ctx.player.getStamina()),
-                       Color::Success);
-    renderer_.drawText(right, 12,
-                       L"力量 " + std::to_wstring(ctx.player.getStrength()) +
-                           L"  智慧 " + std::to_wstring(ctx.player.getWisdom()));
-    renderer_.drawText(right, 13,
-                       L"声望 " + std::to_wstring(ctx.player.getReputation()) +
-                           L"  阶段 " + std::to_wstring(ctx.world.getStage()) +
-                           L"  " + seasonName(ctx.world.getTurnCount()) + L"季");
-    renderer_.drawText(right, 14,
-                       L"食物 " + std::to_wstring(ctx.world.getResource(ResourceType::Food)) +
-                           L"  水 " + std::to_wstring(ctx.world.getResource(ResourceType::Water)));
+    drawStableLine(RIGHT_PANEL, 10,
+                   L"生命 " + progressBar(ctx.player.getHealth()),
+                   ctx.player.getHealth() <= 30 ? Color::Error : Color::Success);
+    drawStableLine(RIGHT_PANEL, 11,
+                   L"体力 " + progressBar(ctx.player.getStamina()), Color::Success);
+    drawStableLine(RIGHT_PANEL, 12,
+                   L"力量 " + std::to_wstring(ctx.player.getStrength()) +
+                       L"  智慧 " + std::to_wstring(ctx.player.getWisdom()), Color::Normal);
+    drawStableLine(RIGHT_PANEL, 13,
+                   L"声望 " + std::to_wstring(ctx.player.getReputation()) +
+                       L"  阶段 " + std::to_wstring(ctx.world.getStage()) +
+                       L"  " + seasonName(ctx.world.getTurnCount()) + L"季", Color::Normal);
+    drawStableLine(RIGHT_PANEL, 14,
+                   L"食物 " + std::to_wstring(ctx.world.getResource(ResourceType::Food)) +
+                       L"  水 " + std::to_wstring(ctx.world.getResource(ResourceType::Water)),
+                   Color::Normal);
     if (combat.isInBattle()) {
-        renderer_.drawText(right, 15,
-                           L"战斗：" + fromUtf8(combat.getBattleState().enemyId) +
-                               L" HP " + std::to_wstring(combat.getBattleState().enemyHealth),
-                           Color::Error);
+        drawStableLine(RIGHT_PANEL, 15,
+                       L"战斗：" + fromUtf8(combat.getBattleState().enemyId) +
+                           L" HP " + std::to_wstring(combat.getBattleState().enemyHealth),
+                       Color::Error);
     } else {
-        renderer_.drawText(right, 15, L"背包：" +
-                                          std::to_wstring(ctx.player.getInventory().getItems().size()) +
-                                          L"/8");
+        drawStableLine(RIGHT_PANEL, 15, L"背包：" +
+                       std::to_wstring(ctx.player.getInventory().getItems().size()) +
+                       L"/8", Color::Normal);
     }
     renderer_.drawText(right, 16, L"【当前目标】", Color::Title);
-    for (SHORT y = 17; y <= 19; ++y)
-        renderer_.drawText(right, y, std::wstring(UI_WIDTH - right, L' '));
     const auto objectiveLines = renderer_.wrapText(fromUtf8(objective),
                                                    UI_WIDTH - right);
-    for (std::size_t i = 0; i < objectiveLines.size() && i < 3; ++i)
-        renderer_.drawText(right, static_cast<SHORT>(17 + i),
-                           objectiveLines[i], Color::Hint);
+    for (std::size_t i = 0; i < 3; ++i)
+        drawStableLine(RIGHT_PANEL, static_cast<SHORT>(17 + i),
+                       i < objectiveLines.size() ? objectiveLines[i] : L"",
+                       Color::Hint);
 
     renderer_.drawText(right, 21, L"【图例/操作】", Color::Title);
     renderer_.drawText(right, 22, L"猴玩家  友/伴NPC  红！主线", Color::Player);
     renderer_.drawText(right, 23, L"物/宝拾取  敌战斗  奇事件", Color::Item);
     renderer_.drawText(right, 24, L"WASD移动  Enter/空格互动", Color::Hint);
 
-    renderer_.drawText(1, 26,
-                       combat.isInBattle()
-                           ? L"战斗模式：请键入攻击/防御/偷窃/使用/逃跑"
-                           : L"I背包  U使用物品  P存档  H帮助  Esc主菜单",
-                       Color::Hint);
-    renderer_.drawText(1, 27, fromUtf8(map.nearbyHint(ctx)), Color::Hint);
+    const Rect bottom{1, 26, UI_WIDTH - 1, UI_HEIGHT - 2};
+    drawStableLine(bottom, 26,
+                   combat.isInBattle()
+                       ? L"战斗模式：请键入攻击/防御/偷窃/使用/逃跑"
+                       : L"I背包  U使用物品  P存档  H帮助  Esc主菜单",
+                   Color::Hint);
+    drawStableLine(bottom, 27, fromUtf8(map.nearbyHint(ctx)), Color::Hint);
     renderer_.drawFrame();
     return true;
 }
@@ -393,6 +411,7 @@ void InteractiveGameUI::showTextPage(const std::wstring& title,
 
 void InteractiveGameUI::clearLog() {
     history_.clear();
+    lastStableRows_.clear();
     needsFullClear_ = true;
 }
 

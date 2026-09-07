@@ -4,6 +4,7 @@
 #include "UI/ConsoleRenderer.h"
 
 #include <optional>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -60,9 +61,12 @@ private:
     ConsoleRenderer& renderer_;
     std::vector<LogLine> history_;
     std::vector<MapTileVisual> lastMapTiles_;
+    std::map<int, LogLine> lastStableRows_;
     bool needsFullClear_ = true;
 
     void centered(SHORT y, const std::wstring& text, Color color);
+    void drawStableLine(Rect area, SHORT y, const std::wstring& text,
+                        Color color);
     int menu(const std::wstring& title,
              const std::vector<std::wstring>& options,
              int initial = 0);

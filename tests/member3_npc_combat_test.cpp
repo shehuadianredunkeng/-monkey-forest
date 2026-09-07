@@ -259,6 +259,37 @@ void testHertzBananaBadEndings() {
            "second banana bad ending flag missing");
 }
 
+void testHertzStoryNeverLeaksIntoOtherBattles() {
+    worlds.clear();
+    Player player;
+    WorldState world;
+    auto rooms = createAllRooms();
+    GameContext ctx{player, world, rooms};
+    world.setFlag("flag_scout_banana_promise");
+
+    CombatSystem raider;
+    const ActionResult raiderStart =
+        raider.startBattle("enemy_raider@room_forest@4@2", ctx);
+    expect(raiderStart.success, "raider battle should start");
+    expect(raiderStart.message.find("赫兹") == std::string::npos &&
+               raiderStart.message.find("巴拿拿") == std::string::npos &&
+               !raider.getBattleState().awaitingBananaChoice,
+           "Hertz banana scene must never appear for a roaming enemy");
+
+    CombatSystem winter;
+    const ActionResult winterStart = winter.startBattle(
+        "enemy_season_guardian_winter@room_cave@8@4", ctx);
+    expect(winterStart.success && winter.getBattleState().enemyHealth >= 50,
+           "winter guardian should use the increased boss health");
+    expect(winterStart.message.find("每第三回合") != std::string::npos &&
+               winterStart.message.find("赫兹") == std::string::npos,
+           "seasonal boss should show its own combat hint");
+    const ActionResult failedTheft =
+        winter.performBattleAction("steal", "", ctx);
+    expect(failedTheft.message.find("智慧达到2级") != std::string::npos,
+           "seasonal relic theft should require preparation");
+}
+
 void testRobotHackAndHertzArmor() {
     worlds.clear();
     Player player;
@@ -360,6 +391,7 @@ int main() {
         testPersistentTheftAndCowardEnding();
         testEscapeSkillAndHertzBananaChoice();
         testHertzBananaBadEndings();
+        testHertzStoryNeverLeaksIntoOtherBattles();
         testRepeatedEscapeEndingAndScoutDeparture();
         testCollectionSystemSupportsNewAndLegacyEndings();
         testNpcPlacementMatchesQuestFlow();
