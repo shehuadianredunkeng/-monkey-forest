@@ -1,11 +1,15 @@
 #include "UI/GameUI.h"
+#include "UI/InteractiveGameUI.h"
 #include "UI/TextLayout.h"
+#include "CombatSystem.h"
+#include "InteractiveMap.h"
 #include "Player.h"
 #include "Room.h"
 #include "WorldState.h"
 
 #include <deque>
 #include <iostream>
+#include <algorithm>
 #include <stdexcept>
 
 namespace {
@@ -149,9 +153,101 @@ void readOnlyAdapter() {
     expect(view.inventorySlots == 1, "inventory count must use public getter");
     expect(view.taskTitle == L"树冠试炼", "guide title adapter");
     expect(view.taskHint.find(L"room_forest") == std::wstring::npos, "task must hide technical ID");
+    expect(view.taskHint.find(L"guide") == std::wstring::npos,
+           "player-facing UI must not require the removed guide command");
     expect(player.getHealth() == 100 && player.getStamina() == 60 && player.getWisdom() == 1 &&
            player.hasItem("item_chip") && world.getTurnCount() == 0 && world.getFlags().size() == 1,
            "UI must not mutate player, turns, flags or inventory");
+}
+
+void interactiveSidebarAndChoiceColors() {
+    auto device = std::make_unique<RecordingSurface>();
+    auto* output = device.get();
+    UI::ConsoleRenderer renderer(std::move(device));
+    UI::InteractiveGameUI ui(renderer);
+
+    Player player;
+    player.addItem(Item("item_fruit", "果实", 2));
+    player.addItem(Item("item_herb", "草药", 1));
+    player.changeSkillLevel(SkillType::Combat, 1);
+    player.changeSkillLevel(SkillType::Leadership, 1);
+    WorldState world;
+    auto rooms = createAllRooms();
+    GameContext ctx{player, world, rooms};
+    InteractiveMap map;
+    map.resetForRoom(ctx);
+    CombatSystem combat;
+    combat.initializeEnemies();
+
+    ui.appendLog("请选择：\n1. 接受香蕉（力量路线）\n2. 拒绝香蕉（智慧路线）");
+    expect(ui.render(ctx, map, combat, "前往果实森林"),
+           "interactive UI should render");
+
+    const auto panelRow = [&](int y) {
+        std::vector<RecordingSurface::Write> row;
+        for (const auto& write : output->writes)
+            if (write.y == y && write.x > UI::DIVIDER_X &&
+                write.x < UI::UI_WIDTH)
+                row.push_back(write);
+        std::sort(row.begin(), row.end(), [](const auto& left, const auto& right) {
+            return left.x < right.x;
+        });
+        std::wstring text;
+        for (const auto& write : row) text += write.text;
+        return text;
+    };
+    const std::wstring skills = panelRow(14);
+    const std::wstring inventory = panelRow(17) + panelRow(18);
+    const bool skillsVisible =
+        skills.find(L"技能") != std::wstring::npos &&
+        skills.find(L"采1") != std::wstring::npos &&
+        skills.find(L"攀1") != std::wstring::npos &&
+        skills.find(L"战2") != std::wstring::npos &&
+        skills.find(L"领2") != std::wstring::npos;
+    const bool fruitVisible = inventory.find(L"果实x2") != std::wstring::npos;
+    const bool herbVisible = inventory.find(L"草药x1") != std::wstring::npos;
+    bool firstChoiceSeen = false;
+    bool secondChoiceSeen = false;
+    UI::Color firstChoiceColor = UI::Color::Normal;
+    UI::Color secondChoiceColor = UI::Color::Normal;
+    for (const auto& write : output->writes) {
+        if (write.x < UI::DIVIDER_X && write.text == L"1") {
+            firstChoiceSeen = true;
+            firstChoiceColor = write.color;
+        }
+        if (write.x < UI::DIVIDER_X && write.text == L"2") {
+            secondChoiceSeen = true;
+            secondChoiceColor = write.color;
+        }
+    }
+    expect(skillsVisible, "four skill levels must remain visible in sidebar");
+    expect(fruitVisible && herbVisible,
+           "inventory item names and counts must remain visible in sidebar");
+    expect(firstChoiceSeen && secondChoiceSeen &&
+               firstChoiceColor == UI::Color::Hint &&
+               secondChoiceColor == firstChoiceColor,
+           "all numbered choices must use the same color");
+}
+
+void interactiveNavigationKeys() {
+    auto device = std::make_unique<RecordingSurface>();
+    auto* input = device.get();
+    UI::ConsoleRenderer renderer(std::move(device));
+    UI::InteractiveGameUI ui(renderer);
+    input->events = {
+        {UI::Key::Up, {}},
+        {UI::Key::Down, {}},
+        {UI::Key::Left, {}},
+        {UI::Key::Text, L"w"}
+    };
+    expect(ui.readExploreAction() == UI::ExploreAction::HistoryUp,
+           "up arrow must scroll older story text");
+    expect(ui.readExploreAction() == UI::ExploreAction::HistoryDown,
+           "down arrow must scroll newer story text");
+    expect(ui.readExploreAction() == UI::ExploreAction::None,
+           "arrow keys must not move the player");
+    expect(ui.readExploreAction() == UI::ExploreAction::MoveUp,
+           "WASD must remain the movement control");
 }
 
 void rendererRejectsOversizedClipAndTinyWindowInput() {
@@ -192,6 +288,8 @@ void unicodeEditingAndHistory() {
 int main() {
     try {
         textCases(); layoutCases(); readOnlyAdapter();
+        interactiveSidebarAndChoiceColors();
+        interactiveNavigationKeys();
         rendererRejectsOversizedClipAndTinyWindowInput(); unicodeEditingAndHistory();
         std::cout << "UI tests passed: Unicode, coordinates, colors, input, read-only adapter\n";
     } catch (const std::exception& error) {

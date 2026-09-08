@@ -1,38 +1,44 @@
-# 4号模块联调说明
+# 4号模块最终联调说明
 
-## 已实现范围
+## 本次完成内容
 
-- `Item`：正式物品 ID 对应的基础数据、关键物品标记和非负数量管理。
-- `Inventory`：8 个不同物品槽位、同 ID 堆叠、单件删除和关键物品保护。
-- `Player`：属性边界、四项技能、背包代理接口和当前位置。
-- `PlayerActions`：`takeItem`、`useItem`、`trainSkill`、`rest`、`showInventory`。
+- 探索移动只使用 `W/A/S/D`，上下箭头逐行翻阅剧情，`PageUp/PageDown` 快速翻页。
+- 成功切换房间固定消耗 3 点体力；房间内走动不消耗体力，体力不足 3 点时禁止切图。
+- 结局使用全屏谢幕界面，不显示地图和状态栏；字幕每行间隔 1 秒，结束后可以上下回看。
+- 所有以 `1.`、`2.`、`1、` 等格式开头的剧情或 NPC 选项统一使用黄色提示色。
+- 右侧状态区常驻显示生命、体力、力量、智慧、声望、公共资源、四项技能和背包物品。
+- 战斗中支持 `背包/inventory/bag` 和 `存档/save`。战斗存档记录玩家、地图和剧情状态；读档后敌人仍在原处，可重新挑战。
+- 玩家界面和房间提示不再要求输入 `guide`，主线目标直接显示在右侧。
+- 背包容量统一使用 `Inventory::MAX_SLOTS`，当前为 12 格；同 ID 物品堆叠。
 
-## 公共接口处理
+## 保持不变的公共接口
 
-- `Player` 和 `Inventory` 严格使用 Final 1.0 的公开接口。
-- 仓库当前把 `GameContext` 定义在 `CommonTypes.h`，因此本模块直接使用该定义，未创建第二套 `GameContext`。
-- 未创建 `SkillSystem`、`GameLoop`、`WorldState` 或 `main`。
-- `tests/TestSupport.cpp` 仅把占位实现 `Player::getCurrentRoomId()` 的返回类型同步为 Final 1.0 的 `const std::string&`，用于保持原地图测试可编译。
+- 玩家属性和技能继续通过 `Player` 的公开 getter 与 change 接口访问。
+- 背包通过 `Player::getInventory()` 只读展示，拾取和使用仍调用 `PlayerActions`。
+- 主线目标由 `EventSystem::getCurrentObjective(ctx)` 提供。
+- 事件选择调用 `EventSystem::chooseEventOption("", option, ctx)`。
+- 战斗完成后调用 `EventSystem::resumePendingEventAfterBattle(ctx)`。
+- 只有 `ActionResult.turnConsumed == true` 时才推进回合。
+- 存档继续通过 `SaveSlots` 与 `SaveManager`，未增加第二套存档格式。
 
-## 关键物品规则
+## 与其他成员的边界
 
-`item_rope`、`item_flint` 和 `item_chip` 在 `PlayerActions` 创建时标记为关键物品。`Inventory::removeItem` 拒绝删除标记为关键的物品。普通物品每次删除一个数量单位。
+- 2号继续维护主线事件、结局原文和智慧成长路径；4号只负责显示、输入和主循环衔接。
+- 3号继续维护 NPC、敌人、战斗结算、成就条件；4号只开放战斗中的背包和存档入口。
+- 5号继续维护完整存档内容和结局判定。当前战斗内部的敌方剩余生命不会写入存档，因此读档后从该敌人的完整战斗重新开始。
+- 1号继续维护地图地形和房间连接；4号只执行切图体力规则。
 
-## 需要后续成员联调
+## 验证结果
 
-1. `Room` 目前只公开只读的 `getItemIds()`，没有物品移除接口。因此 `takeItem` 成功后不能安全地从房间永久移除该物品；地图或 `WorldState` 模块需要统一决定房间物品的持久状态。
-2. `item_rope`、`item_flint`、`item_chip` 的剧情效果属于地图/事件系统；`useItem` 不修改世界状态，也不推进剧情。
-3. 所有玩家动作只设置 `ActionResult.turnConsumed`，不会直接消耗回合；最终主循环负责统一处理回合。
-4. `tests/member4_player_test.cpp` 为链接现有 `Room.cpp` 提供了测试专用的 `WorldState::hasFlag` 最小实现。整合正式 `WorldState.cpp` 后，应避免在同一测试目标中同时链接两份实现。
+Visual Studio 2022 Release 构建成功，以下 8 组测试全部通过：
 
-## 构建与测试
+- `ui_layout_tests`
+- `map_tests`
+- `member4_tests`
+- `member3_tests`
+- `member2_tests`
+- `member5_tests`
+- `interactive_map_tests`
+- `save_slots_tests`
 
-仓库 CMake 已增加 `monkey_player` 和 `member4_tests` 目标。标准验证命令：
-
-```bash
-cmake -S . -B build
-cmake --build build --config Debug
-ctest --test-dir build -C Debug --output-on-failure
-```
-
-4号开发环境未提供 CMake，因此提交前使用 `g++ 13.3.0 -std=c++17 -Wall -Wextra -Wpedantic` 分别编译并运行原地图测试和 `member4_player_test`。
+其中 `member2_tests` 已验证：即使树冠试炼未选择智慧奖励，后续河谷研究、回声研究和日志研究仍可使智慧达到 4。

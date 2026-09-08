@@ -262,16 +262,17 @@ std::string battleHelp() {
     return "战斗仍使用短指令：\n"
            "攻击（attack）  防御（guard）  偷窃（steal）\n"
            "分析（analyze） 破解（hack） 逃跑（escape）\n"
-           "使用 草药 / use herb；背包 / inventory\n"
+           "使用 草药 / use herb；背包 / inventory；存档 / save\n"
            "赫兹递出香蕉时，可直接输入 1、2 或 3。";
 }
 
 std::string gameHelp() {
     return "【探索操作】\n"
-           "W/A/S/D 或方向键：在房间内移动\n"
+           "W/A/S/D：在房间内移动\n"
+           "↑/↓：逐行翻看以往剧情；PgUp/PgDn：快速翻页\n"
            "Enter / 空格：与身边目标互动\n"
            "I：查看背包    U：输入名称使用物品\n"
-           "P：选择存档位保存    PgUp/PgDn：翻看以往剧情    Esc：暂停菜单\n\n"
+           "P：选择存档位保存    Esc：暂停菜单\n\n"
            "【地图图例】\n"
            "猴=玩家  友/伴=NPC  物=物品  宝=宝箱  敌=战斗  ！=关键剧情\n"
            "青色“门”可切换房间，红色“锁”表示尚未满足通行条件，“奇”是本回合地点事件。\n"
@@ -349,7 +350,9 @@ void updateProfile(GameContext& ctx, WorldState& profile,
 
 void handleBattleCommand(const std::string& line, GameContext& ctx,
                          CombatSystem& combat, EventSystem& events,
-                         ProgressSystem& progress, UI::InteractiveGameUI& ui) {
+                         ProgressSystem& progress, UI::InteractiveGameUI& ui,
+                         InteractiveMap& map, SaveSlots& slots,
+                         SaveManager& saveManager) {
     const std::vector<std::string> parts = words(trim(line));
     if (parts.empty()) return;
     std::string action = lowerAscii(parts.front());
@@ -360,6 +363,19 @@ void handleBattleCommand(const std::string& line, GameContext& ctx,
     }
     if (action == "背包" || action == "inventory" || action == "bag") {
         ui.appendLog(showInventory(ctx.player));
+        return;
+    }
+    if (action == "存档" || action == "save" || action == "p" ||
+        action == "k") {
+        const int slot = ui.showSlotMenu(L"战 斗 中 存 档",
+                                          slotDescriptions(slots), true);
+        if (slot > 0) {
+            map.storePosition(ctx);
+            ui.appendLog(slots.save(slot, ctx, saveManager)
+                ? "战斗进度已保存到存档位" + std::to_string(slot) +
+                      "；读档后可在当前位置重新挑战该敌人。"
+                : "保存失败，请检查目录权限。");
+        }
         return;
     }
     const ActionResult battle = combat.performBattleAction(action, target, ctx);
@@ -427,7 +443,8 @@ GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
             const std::optional<std::string> command =
                 ui.readTypedCommand(L"战斗指令 > ");
             if (command) handleBattleCommand(*command, ctx, combat, events,
-                                              progress, ui);
+                                              progress, ui, map, slots,
+                                              saveManager);
             continue;
         }
 

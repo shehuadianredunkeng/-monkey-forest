@@ -45,6 +45,17 @@ Color messageColor(const std::wstring& text) {
     return Color::Normal;
 }
 
+bool isNumberedChoice(const std::wstring& text) {
+    const std::size_t first = text.find_first_not_of(L" \t");
+    if (first == std::wstring::npos) return false;
+    const wchar_t number = text[first];
+    if (number < L'1' || number > L'9') return false;
+    if (first + 1 >= text.size()) return false;
+    const wchar_t separator = text[first + 1];
+    return separator == L'.' || separator == L'、' || separator == L')' ||
+           separator == L'）' || separator == L':' || separator == L'：';
+}
+
 std::wstring joinGlyphs(const std::vector<std::wstring>& glyphs,
                         std::size_t from, std::size_t to) {
     std::wstring text;
@@ -77,6 +88,25 @@ std::wstring progressBar(int value) {
 std::wstring seasonName(int turn) {
     static const wchar_t* seasons[] = {L"春", L"夏", L"秋", L"冬"};
     return seasons[(turn / 6) % 4];
+}
+
+std::wstring skillSummary(const Player& player) {
+    return L"技能 采" + std::to_wstring(player.getSkillLevel(SkillType::Gather)) +
+           L" 攀" + std::to_wstring(player.getSkillLevel(SkillType::Climb)) +
+           L" 战" + std::to_wstring(player.getSkillLevel(SkillType::Combat)) +
+           L" 领" + std::to_wstring(player.getSkillLevel(SkillType::Leadership));
+}
+
+std::wstring inventorySummary(const Player& player) {
+    const auto& items = player.getInventory().getItems();
+    if (items.empty()) return L"空";
+    std::wstring summary;
+    for (const Item& item : items) {
+        if (!summary.empty()) summary += L"  ";
+        summary += fromUtf8(item.getName()) + L"x" +
+                   std::to_wstring(item.getCount());
+    }
+    return summary;
 }
 
 void replaceAll(std::wstring& text, const std::wstring& from,
@@ -136,9 +166,12 @@ void InteractiveGameUI::appendLog(const std::string& text) {
         const std::size_t end = wide.find(L'\n', start);
         const std::wstring line = wide.substr(
             start, end == std::wstring::npos ? end : end - start);
+        const Color lineColor = isNumberedChoice(line)
+                                    ? Color::Hint
+                                    : messageColor(line);
         for (const std::wstring& wrapped :
              renderer_.wrapText(line, DIVIDER_X - 3))
-            history_.push_back({wrapped, messageColor(wrapped)});
+            history_.push_back({wrapped, lineColor});
         if (end == std::wstring::npos) break;
         start = end + 1;
     } while (start <= wide.size());
@@ -212,43 +245,54 @@ bool InteractiveGameUI::render(const GameContext& ctx,
                    L"体力 " + progressBar(ctx.player.getStamina()), Color::Success);
     drawStableLine(RIGHT_PANEL, 12,
                    L"力量 " + std::to_wstring(ctx.player.getStrength()) +
-                       L"  智慧 " + std::to_wstring(ctx.player.getWisdom()), Color::Normal);
-    drawStableLine(RIGHT_PANEL, 13,
-                   L"声望 " + std::to_wstring(ctx.player.getReputation()) +
-                       L"  阶段 " + std::to_wstring(ctx.world.getStage()) +
-                       L"  " + seasonName(ctx.world.getTurnCount()) + L"季", Color::Normal);
-    drawStableLine(RIGHT_PANEL, 14,
-                   L"食物 " + std::to_wstring(ctx.world.getResource(ResourceType::Food)) +
-                       L"  水 " + std::to_wstring(ctx.world.getResource(ResourceType::Water)),
+                       L"  智慧 " + std::to_wstring(ctx.player.getWisdom()) +
+                       L"  声望 " + std::to_wstring(ctx.player.getReputation()),
                    Color::Normal);
+    drawStableLine(RIGHT_PANEL, 13,
+                   L"阶段 " + std::to_wstring(ctx.world.getStage()) + L"  " +
+                       seasonName(ctx.world.getTurnCount()) + L"季  食" +
+                       std::to_wstring(ctx.world.getResource(ResourceType::Food)) +
+                       L" 水" +
+                       std::to_wstring(ctx.world.getResource(ResourceType::Water)),
+                   Color::Normal);
+    drawStableLine(RIGHT_PANEL, 14, skillSummary(ctx.player), Color::Hint);
     if (combat.isInBattle()) {
         drawStableLine(RIGHT_PANEL, 15,
                        L"战斗：" + fromUtf8(combat.getBattleState().enemyId) +
                            L" HP " + std::to_wstring(combat.getBattleState().enemyHealth),
                        Color::Error);
     } else {
-        drawStableLine(RIGHT_PANEL, 15, L"背包：" +
-                       std::to_wstring(ctx.player.getInventory().getItems().size()) +
-                       L"/" + std::to_wstring(Inventory::MAX_SLOTS), Color::Normal);
+        drawStableLine(RIGHT_PANEL, 15, L"", Color::Normal);
     }
-    renderer_.drawText(right, 16, L"【当前目标】", Color::Title);
+    drawStableLine(RIGHT_PANEL, 16, L"背包 " +
+                   std::to_wstring(ctx.player.getInventory().getItems().size()) +
+                   L"/" + std::to_wstring(Inventory::MAX_SLOTS), Color::Title);
+    const auto inventoryLines = renderer_.wrapText(
+        inventorySummary(ctx.player), UI_WIDTH - right);
+    for (std::size_t i = 0; i < 2; ++i)
+        drawStableLine(RIGHT_PANEL, static_cast<SHORT>(17 + i),
+                       i < inventoryLines.size()
+                           ? (i == 1 && inventoryLines.size() > 2
+                                  ? renderer_.clip(inventoryLines[i],
+                                                   UI_WIDTH - right - 10) +
+                                        L"…按I查看"
+                                  : inventoryLines[i])
+                           : L"",
+                       Color::Item);
+
+    renderer_.drawText(right, 21, L"【当前目标】", Color::Title);
     const auto objectiveLines = renderer_.wrapText(fromUtf8(objective),
                                                    UI_WIDTH - right);
     for (std::size_t i = 0; i < 3; ++i)
-        drawStableLine(RIGHT_PANEL, static_cast<SHORT>(17 + i),
+        drawStableLine(RIGHT_PANEL, static_cast<SHORT>(22 + i),
                        i < objectiveLines.size() ? objectiveLines[i] : L"",
                        Color::Hint);
-
-    renderer_.drawText(right, 21, L"【图例/操作】", Color::Title);
-    renderer_.drawText(right, 22, L"猴玩家  友/伴NPC  红！主线", Color::Player);
-    renderer_.drawText(right, 23, L"物/宝拾取  敌战斗  奇事件", Color::Item);
-    renderer_.drawText(right, 24, L"WASD移动  Enter/空格互动", Color::Hint);
 
     const Rect bottom{1, 26, UI_WIDTH - 1, UI_HEIGHT - 2};
     drawStableLine(bottom, 26,
                    combat.isInBattle()
-                       ? L"战斗模式：请键入攻击/防御/偷窃/使用/逃跑"
-                       : L"I背包 U物品 P存档 H帮助 PgUp/PgDn翻剧情 Esc菜单",
+                       ? L"战斗：攻击/防御/偷窃/使用/逃跑 背包/inventory 存档/save"
+                       : L"WASD移动 ↑↓翻剧情 I背包 U物品 P存档 H帮助 Esc菜单",
                    Color::Hint);
     drawStableLine(bottom, 27, fromUtf8(map.nearbyHint(ctx)), Color::Hint);
     renderer_.drawFrame();
@@ -260,10 +304,17 @@ ExploreAction InteractiveGameUI::readExploreAction() {
         const InputEvent event = renderer_.readEvent();
         if (event.key == Key::EndOfInput) return ExploreAction::EndOfInput;
         if (event.key == Key::Resize) return ExploreAction::None;
-        if (event.key == Key::Up) return ExploreAction::MoveUp;
-        if (event.key == Key::Down) return ExploreAction::MoveDown;
-        if (event.key == Key::Left) return ExploreAction::MoveLeft;
-        if (event.key == Key::Right) return ExploreAction::MoveRight;
+        if (event.key == Key::Up) {
+            historyScrollBack_ += 1;
+            return ExploreAction::HistoryUp;
+        }
+        if (event.key == Key::Down) {
+            historyScrollBack_ = historyScrollBack_ > 0
+                                     ? historyScrollBack_ - 1 : 0;
+            return ExploreAction::HistoryDown;
+        }
+        if (event.key == Key::Left || event.key == Key::Right)
+            return ExploreAction::None;
         if (event.key == Key::Enter) return ExploreAction::Interact;
         if (event.key == Key::Escape) return ExploreAction::Menu;
         if (event.key == Key::PageUp) {
@@ -477,7 +528,7 @@ void InteractiveGameUI::showEndingCinematic(const std::wstring& title,
             renderer_.drawText(8, static_cast<SHORT>(5 + revealed - first),
                                lines[revealed], messageColor(lines[revealed]));
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(180));
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
     std::size_t offset = first;

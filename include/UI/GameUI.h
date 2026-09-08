@@ -20,7 +20,8 @@ struct GameView {
     int inventorySlots = 0;
     bool inBattle = false;
 };
-GameView readGameView(const GameContext& ctx, bool inBattle, const std::wstring& guide);
+GameView readGameView(const GameContext& ctx, bool inBattle,
+                      const std::wstring& objectiveText);
 
 class GameUI {
 public:
