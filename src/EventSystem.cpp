@@ -180,8 +180,8 @@ ActionResult EventSystem::triggerEvent(const std::string& eventId,
         return makeResult(false,
                           resolvedId == kRandomRequestId
                               ? "当前地点没有新的随机事件。请前往其他地点继续探索，"
-                                "之后可继续在地图中寻找闪光点。"
-                              : "没有找到对应事件，请查看右侧当前目标。");
+                                "之后可再次输入“随机（random）”。"
+                              : "没有找到对应事件，请查看界面中的主线目标后继续探索。");
     }
     if (ctx.world.hasFlag(event->pendingFlag())) {
         activeEventId_ = event->eventId;
@@ -214,7 +214,8 @@ ActionResult EventSystem::chooseEventOption(const std::string& eventId,
     const Event* event = findEvent(resolvedId);
     if (event == nullptr) {
         return makeResult(false,
-                          "当前没有等待选择的事件。请前往红色任务点互动。");
+                          "当前没有等待选择的事件。请到目标地点触发主线，"
+                          "或输入“调查（investigate）”重新查看事件。");
     }
     if (!ctx.world.hasFlag(event->pendingFlag())) {
         return makeResult(false,
@@ -358,23 +359,17 @@ ActionResult EventSystem::resolveChoice(const Event& event,
                 ctx);
         }
         if (option == 2) {
-            if (player.getStamina() < 10) {
-                return makeResult(false, "体力至少需要10点才能攀上树冠。");
+            if (player.getStrength() < 2 || player.getStamina() < 10) {
+                return makeResult(false,
+                                  "稳住树冠粗枝需要力量至少2点且体力至少10点。");
             }
             player.changeStamina(-10);
             player.changeReputation(4);
-            if (player.getSkillLevel(SkillType::Climb) >= 2) {
-                world.changeResource(ResourceType::Food, 4);
-                return completeEvent(
-                    event,
-                    "你熟练地绕过蜂巢，带回四份果实。体力-10，声望+4，公共食物+4。",
-                    ctx);
-            }
-            player.changeHealth(-5);
-            world.changeResource(ResourceType::Food, 3);
+            world.changeResource(ResourceType::Food, 4);
             return completeEvent(
                 event,
-                "你采到三份果实，但被枯枝划伤。体力-10，生命-5，声望+4，公共食物+3。",
+                "你用双臂压稳粗枝，绕到蜂巢背面摘下最饱满的果实。"
+                "体力-10，声望+4，公共食物+4。",
                 ctx);
         }
         if (player.getStamina() < 8) {
@@ -481,8 +476,9 @@ ActionResult EventSystem::resolveChoice(const Event& event,
             player.changeStamina(-12);
             player.changeWisdom(1);
         } else if (option == 2) {
-            if (player.getSkillLevel(SkillType::Climb) < 2) {
-                return makeResult(false, "该路线需要攀爬技能至少2级。");
+            if (player.getStrength() < 2 || player.getStamina() < 6) {
+                return makeResult(false,
+                                  "推稳石梁需要力量至少2点且体力至少6点。");
             }
             if (!grantChip(player)) {
                 return makeResult(false,
@@ -534,19 +530,12 @@ ActionResult EventSystem::resolveChoice(const Event& event,
             if (player.getWisdom() < 2) {
                 return makeResult(false, "研究晶片需要智慧至少2点。");
             }
-            const bool firstResearch =
-                !world.hasFlag("flag_drone_analyzed");
-            if (firstResearch) {
-                player.changeWisdom(1);
-            }
+            player.changeWisdom(1);
             world.setFlag("flag_route_hack_ready");
             return completeEvent(
                 event,
-                firstResearch
-                    ? "你反复观察晶片纹路与响应方式，破译了部分控制协议。"
-                      "智慧+1，智取路线准备完成。"
-                    : "你已经从侦察机核心理解过这套技术，本次没有重复获得智慧，"
-                      "但智取路线准备已经完成。",
+                "你把晶片纹路与河谷管线逐一对应，终于破译出控制协议。"
+                "智慧+1，智取路线准备完成。",
                 ctx);
         }
         if (player.getStamina() < 10) {
@@ -651,23 +640,6 @@ ActionResult EventSystem::resolveChoice(const Event& event,
     }
 
     if (event.eventId == "event_final_choice") {
-        if (option == 4) {
-            const bool allRelics =
-                world.hasFlag("flag_season_relic_spring") &&
-                world.hasFlag("flag_season_relic_summer") &&
-                world.hasFlag("flag_season_relic_autumn") &&
-                world.hasFlag("flag_season_relic_winter");
-            if (!allRelics)
-                return makeResult(false,
-                    "祈福需要集齐四件信物：春花、蝉蜕、秋叶和落雪。");
-            world.setFlag("flag_hidden_ending_earth_gift");
-            world.setFlag("flag_final_choice");
-            return completeEvent(
-                event,
-                "你将四季信物放在猴王树根部，向脚下的土地祈福。"
-                "沉睡的自然之力回应了青木谷，地球的礼物已经苏醒。",
-                ctx);
-        }
         if (option == 1) {
             if (!world.hasFlag("flag_route_resist_ready") ||
                 player.getReputation() < 60 ||
@@ -804,20 +776,13 @@ ActionResult EventSystem::resolveChoice(const Event& event,
                 return makeResult(false,
                                   "背包已满，无法安全取走星猿晶片。");
             }
-            const bool firstResearch =
-                !world.hasFlag("flag_route_hack_ready");
-            if (firstResearch) {
-                player.changeWisdom(1);
-            }
+            player.changeReputation(4);
             world.setFlag("flag_chip_found");
             world.setFlag("flag_drone_analyzed");
             return completeEvent(
                 event,
-                firstResearch
-                    ? "你拆解侦察机核心，读懂了部分星猿数据。"
-                      "智慧+1，晶片已放入背包。"
-                    : "你已经通过晶片研究理解过这套技术，本次没有重复获得智慧，"
-                      "但仍取得了侦察机核心中的晶片。",
+                "你拆下仍在发光的核心，把侦察机与蓝色河水的联系告诉猴群。"
+                "声望+4，星猿晶片已放入背包。",
                 ctx);
         }
         if (option == 2) {
@@ -860,10 +825,10 @@ ActionResult EventSystem::completeEvent(const Event& event,
     std::string playerMessage = message;
     if (event.kind == EventKind::Random) {
         playerMessage +=
-            "\n随机事件已经结束。下一步可输入“指引（guide）”查看主线目标。";
+            "\n随机事件已经结束，请查看界面中的主线目标继续行动。";
     } else if (event.eventId != "event_final_choice") {
         playerMessage +=
-            "\n下一步可输入“指引（guide）”查看新的主线目标。";
+            "\n本段主线已经完成，请查看界面中的新目标继续行动。";
     }
     return makeResult(true,
                       playerMessage,
