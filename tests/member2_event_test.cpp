@@ -146,7 +146,7 @@ void testMainEventAndDuplicateProtection() {
     const ActionResult prompt = events.triggerEvent("event_tree_trial", ctx);
     expect(prompt.success, "tree trial should trigger");
     expect(prompt.message.find("【事件】树冠试炼") != std::string::npos &&
-               prompt.message.find("需要体力≥10") != std::string::npos,
+               prompt.message.find("需要力量≥2且体力≥10") != std::string::npos,
            "main prompt should use Chinese and show option requirements");
     expect(prompt.message.find("event_tree_trial") == std::string::npos &&
                prompt.message.find("flag_") == std::string::npos,
@@ -238,7 +238,7 @@ void testWisdomRouteSurvivesMissingTreeReward() {
            "repeated investigation must not grant wisdom again");
 }
 
-void testDroneAndChipResearchShareOneWisdomReward() {
+void testRandomEventDoesNotGrantCoreAttributes() {
     Player player;
     WorldState world;
     resetWorld(world);
@@ -251,22 +251,54 @@ void testDroneAndChipResearchShareOneWisdomReward() {
     player.setCurrentRoomId("room_river");
     const ActionResult dronePrompt =
         events.triggerEvent("event_drone_crash", ctx);
-    expect(dronePrompt.success &&
-               dronePrompt.message.find("无智慧门槛") != std::string::npos,
-           "drone research should be available at starting wisdom");
+    expect(dronePrompt.success,
+           "drone interaction should be available at starting attributes");
+    const int initialWisdom = player.getWisdom();
+    const int initialStrength = player.getStrength();
     expect(events.chooseEventOption("", 1, ctx).success,
            "drone research should resolve");
-    expect(player.getWisdom() == 2,
-           "drone research should grant wisdom at starting value");
+    expect(player.getWisdom() == initialWisdom &&
+               player.getStrength() == initialStrength,
+           "random events must not grant wisdom or strength");
+    expect(player.getReputation() == 4,
+           "drone interaction should grant reputation instead");
 
     world.setStage(4);
     player.setCurrentRoomId("room_river");
+    player.changeWisdom(1);
     expect(events.triggerEvent("event_drought_choice", ctx).success,
            "later chip research should still prepare the route");
     expect(events.chooseEventOption("", 2, ctx).success,
            "later chip research should resolve");
-    expect(player.getWisdom() == 2,
-           "drone and chip research must not grant the shared reward twice");
+    expect(player.getWisdom() == initialWisdom + 2,
+           "main-story chip research must still grant wisdom after the random event");
+}
+
+void testEventClimbChecksAreReplacedByStrength() {
+    const auto allEvents = createAllEvents();
+    for (const auto& [id, event] : allEvents) {
+        for (const std::string& choice : event.choices) {
+            expect(choice.find("攀爬") == std::string::npos,
+                   "member 2 event choices must not require climbing: " + id);
+        }
+    }
+
+    Player player;
+    WorldState world;
+    resetWorld(world);
+    auto rooms = createAllRooms();
+    GameContext ctx{player, world, rooms};
+    EventSystem events;
+    events.initializeEvents();
+
+    player.setCurrentRoomId("room_forest");
+    expect(events.triggerEvent("event_tree_trial", ctx).success,
+           "tree trial should trigger");
+    expect(!events.chooseEventOption("", 2, ctx).success,
+           "tree branch route should reject insufficient strength");
+    player.changeStrength(1);
+    expect(events.chooseEventOption("", 2, ctx).success,
+           "tree branch route should accept strength two");
 }
 
 void testBaseLogCanProvideFinalWisdomPoint() {
@@ -308,8 +340,10 @@ void testAllRandomEventsCanBeCompleted() {
            "first random event should trigger");
     const ActionResult firstResult = events.chooseEventOption("", 1, ctx);
     expect(firstResult.success, "first random event should finish");
-    expect(firstResult.message.find("指引（guide）") != std::string::npos,
-           "random event result should explain the next step");
+    expect(firstResult.message.find("指引") == std::string::npos &&
+               firstResult.message.find("guide") == std::string::npos &&
+               firstResult.message.find("主线目标") != std::string::npos,
+           "random event result should point to the sidebar without guide");
 
     expect(events.triggerEvent("event_wildfire", ctx).success,
            "second random event in the same room should still trigger");
@@ -541,6 +575,15 @@ void testPendingRecoveryAndStoryText() {
     expect(loaded.getEndingText("ending_fail").find("失落之谷") !=
                std::string::npos,
            "failure ending missing");
+    const std::string endingIds[] = {
+        "ending_resist", "ending_hack", "ending_migrate", "ending_fail"};
+    for (const std::string& id : endingIds) {
+        const std::string ending = loaded.getEndingText(id);
+        expect((ending.find("[解锁条件：") != std::string::npos ||
+                ending.find("[触发条件：") != std::string::npos) &&
+                   ending.find("[结局评价：") != std::string::npos,
+               "ending should show its condition and evaluation: " + id);
+    }
     for (int stage = 1; stage <= 6; ++stage) {
         const std::string intro = loaded.getStageIntroduction(stage);
         expect(intro.find("event_") == std::string::npos &&
@@ -559,7 +602,8 @@ int main() {
         testMainEventAndDuplicateProtection();
         testStoryPathGrantsRealChipItem();
         testWisdomRouteSurvivesMissingTreeReward();
-        testDroneAndChipResearchShareOneWisdomReward();
+        testRandomEventDoesNotGrantCoreAttributes();
+        testEventClimbChecksAreReplacedByStrength();
         testBaseLogCanProvideFinalWisdomPoint();
         testAllRandomEventsCanBeCompleted();
         testRealCombatBridge();
