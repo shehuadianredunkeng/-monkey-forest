@@ -11,6 +11,16 @@
 - 新增 `CollectionSystem`：统一注册、解锁、去重、计数和显示成就/结局。
 - `getEndingCollectionText(world)` 与 `getAchievementCollectionText(world)` 可直接交给UI显示。
 - `syncLegacyFlags(world)` 用于读档后兼容旧旗标，5号应在读档完成后调用一次。
+- 豆豆救治时统一发布 `flag_child_rescued`、`flag_child_saved`、
+  `flag_child_returned`；亲自背回时额外发布 `flag_child_carried_home`，供1号地图
+  隐藏河谷豆豆并在猴王树显示豆豆。
+- 岩背、获救后的豆豆、入队后的闪尾均按 `WorldState::getStage()` 提供1至6阶段
+  不同对话，不另建私有年份字段。
+- 战斗胜利只写入 `flag_bees_defeated`、`flag_robot_defeated`、
+  `flag_hertz_defeated`，不删除2号的 `flag_pending_battle_*`，由
+  `EventSystem::resumePendingEventAfterBattle(ctx)` 完成后续剧情。
+- 成就同步直接读取2号公开旗标：三个随机事件完成、无战斗取得完整日志、三条路线
+  均准备完成；不访问2号事件系统私有状态。
 
 ## 新结局接入规范
 
