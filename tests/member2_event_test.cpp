@@ -308,7 +308,7 @@ void testAllRandomEventsCanBeCompleted() {
            "first random event should trigger");
     const ActionResult firstResult = events.chooseEventOption("", 1, ctx);
     expect(firstResult.success, "first random event should finish");
-    expect(firstResult.message.find("指引（guide）") != std::string::npos,
+    expect(firstResult.message.find("右侧当前目标") != std::string::npos,
            "random event result should explain the next step");
 
     expect(events.triggerEvent("event_wildfire", ctx).success,

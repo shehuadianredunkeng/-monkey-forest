@@ -224,13 +224,13 @@ std::string Room::getDynamicRecommendation(const GameContext& context) const {
         objective = "返回猴王树作出最终选择";
         break;
     default:
-        return "提示：当前没有新的主线目标，可输入 guide 查看游戏进度。";
+        return "提示：当前没有新的主线目标，请查看右侧当前目标。";
     }
 
     std::string result;
     if (currentRoomId == targetRoomId) {
         result = "提示：当前主线目标：" + objective +
-                 "。输入 investigate 继续主线。";
+                 "。请前往红色任务点，按 Enter 或空格继续。";
     } else {
         std::string targetName = targetRoomId;
         const auto target = context.rooms.find(targetRoomId);
@@ -238,8 +238,7 @@ std::string Room::getDynamicRecommendation(const GameContext& context) const {
             targetName = target->second.getName();
         }
         result = "提示：当前主线目标：" + objective +
-                 "。请前往" + targetName +
-                 "，可输入 guide 查看下一步路线。";
+                 "。请前往" + targetName + "，并留意右侧当前目标。";
     }
 
     if (!getVisibleItemIds(context).empty()) {

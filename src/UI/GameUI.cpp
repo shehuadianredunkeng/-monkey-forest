@@ -25,7 +25,8 @@ Color logColor(const std::wstring& text) {
 }
 }
 
-GameView readGameView(const GameContext& ctx, bool inBattle, const std::wstring& guide) {
+GameView readGameView(const GameContext& ctx, bool inBattle,
+                      const std::wstring& objective) {
     GameView view;
     // Only existing public const getters. No HP/SP aliases or new Task model needed.
     const Player& player = ctx.player;
@@ -38,8 +39,8 @@ GameView readGameView(const GameContext& ctx, bool inBattle, const std::wstring&
     view.reputation = player.getReputation();
     view.inventorySlots = static_cast<int>(player.getInventory().getItems().size());
     view.inBattle = inBattle;
-    std::wstring clean = guide;
-    // The existing guide includes technical IDs. Hide them in the presentation only.
+    std::wstring clean = objective;
+    // The objective may include technical room IDs. Hide them in presentation.
     for (auto start = clean.find(L"（room_"); start != std::wstring::npos; start = clean.find(L"（room_")) {
         const auto end = clean.find(L'）', start);
         if (end == std::wstring::npos) { clean.erase(start); break; }
@@ -49,7 +50,9 @@ GameView readGameView(const GameContext& ctx, bool inBattle, const std::wstring&
     view.taskTitle = clean.substr(0, newline);
     const std::wstring prefix = L"当前主线：";
     if (view.taskTitle.find(prefix) == 0) view.taskTitle.erase(0, prefix.size());
-    view.taskHint = newline == std::wstring::npos ? L"输入 guide 查看详情" : clean.substr(newline + 1);
+    view.taskHint = newline == std::wstring::npos
+                        ? L"请根据右侧目标前往彩色任务点"
+                        : clean.substr(newline + 1);
     view.taskStatus = player.getHealth() <= 0 || world.hasFlag("flag_final_choice") ? L"已结束" :
         clean.find(L"已完成") != std::wstring::npos || clean.find(L"已经完成") != std::wstring::npos ? L"已完成" : L"进行中";
     return view;

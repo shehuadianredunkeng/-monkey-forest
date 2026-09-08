@@ -168,10 +168,17 @@ bool InteractiveGameUI::render(const GameContext& ctx,
             currentTiles.push_back(tile);
             if (fullRedraw || index >= lastMapTiles_.size() ||
                 tile.glyph != lastMapTiles_[index].glyph ||
-                tile.color != lastMapTiles_[index].color)
+                tile.color != lastMapTiles_[index].color) {
+                // Every map cell owns exactly two console columns. Padding the
+                // replacement prevents a one-column floor glyph from leaving
+                // half of the previous player/NPC/wall glyph behind.
+                std::wstring glyph = renderer_.clip(tile.glyph, 2);
+                glyph += std::wstring(static_cast<std::size_t>(std::max(
+                    0, 2 - renderer_.columns(glyph))), L' ');
                 renderer_.drawText(static_cast<SHORT>(1 + x * 2),
-                                   static_cast<SHORT>(2 + y), tile.glyph,
+                                   static_cast<SHORT>(2 + y), glyph,
                                    tile.color);
+            }
         }
     }
     lastMapTiles_ = std::move(currentTiles);

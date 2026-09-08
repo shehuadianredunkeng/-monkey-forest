@@ -53,6 +53,7 @@ public:
     int playerX() const;
     int playerY() const;
     const std::string& roomId() const;
+    char terrainAt(int x, int y) const;
     MapTileVisual visualAt(int x, int y, const GameContext& ctx) const;
     std::string nearbyHint(const GameContext& ctx) const;
 

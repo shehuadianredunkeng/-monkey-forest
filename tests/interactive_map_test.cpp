@@ -5,11 +5,21 @@
 #include "WorldState.h"
 
 #include <iostream>
+#include <set>
 #include <stdexcept>
+#include <string>
 
 namespace {
 void expect(bool condition, const char* message) {
     if (!condition) throw std::runtime_error(message);
+}
+
+std::string terrainSignature(const InteractiveMap& map) {
+    std::string signature;
+    for (int y = 0; y < map.height(); ++y)
+        for (int x = 0; x < map.width(); ++x)
+            signature.push_back(map.terrainAt(x, y));
+    return signature;
 }
 }
 
@@ -22,6 +32,50 @@ int main() {
         GameContext ctx{player, world, rooms};
         InteractiveMap map;
         map.resetForRoom(ctx);
+
+        const std::string roomIds[] = {
+            "room_tree", "room_forest", "room_river", "room_cave", "room_base"};
+        std::set<std::string> terrainLayouts;
+        for (const std::string& roomId : roomIds) {
+            player.setCurrentRoomId(roomId);
+            map.resetForRoom(ctx);
+            const std::string signature = terrainSignature(map);
+            expect(signature.find('#') != std::string::npos,
+                   "every room should contain solid terrain");
+            for (int y = 0; y < map.height(); ++y)
+                for (int x = 0; x < map.width(); ++x) {
+                    const std::wstring glyph = map.visualAt(x, y, ctx).glyph;
+                    const bool interactive =
+                        glyph != L"##" && glyph != L"~~" && glyph != L"··";
+                    if (interactive) {
+                        const char floor = map.terrainAt(x, y);
+                        if (floor == '#' || floor == '~')
+                            throw std::runtime_error(
+                                "interactive marker hidden in terrain: " + roomId +
+                                " (" + std::to_string(x) + "," +
+                                std::to_string(y) + ")");
+                    }
+                }
+            terrainLayouts.insert(signature);
+        }
+        expect(terrainLayouts.size() == 5,
+               "all five rooms should have distinct terrain layouts");
+        player.setCurrentRoomId("room_river");
+        map.resetForRoom(ctx);
+        expect(terrainSignature(map).find('~') != std::string::npos,
+               "river room should contain a visible river");
+
+        player.setCurrentRoomId("room_tree");
+        map.resetForRoom(ctx);
+        const std::string terrainBeforeWalking = terrainSignature(map);
+        expect(map.visualAt(1, 1, ctx).glyph == L"··",
+               "floor tile should occupy the complete two-column map cell");
+        map.move(0, -1, ctx);
+        map.move(0, 1, ctx);
+        map.move(-1, 0, ctx);
+        map.move(1, 0, ctx);
+        expect(terrainSignature(map) == terrainBeforeWalking,
+               "walking must never erase walls, water, or floor terrain");
 
         expect(map.width() == 36 && map.height() == 15,
                "interactive room dimensions changed");

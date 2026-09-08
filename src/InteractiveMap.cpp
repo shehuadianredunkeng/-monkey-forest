@@ -29,6 +29,91 @@ void scatter(std::vector<std::string>& map, char tile,
     for (const auto& point : points) map[point.second][point.first] = tile;
 }
 
+void horizontal(std::vector<std::string>& map, int y, int from, int to,
+                char tile = '#') {
+    for (int x = from; x <= to; ++x) map[y][x] = tile;
+}
+
+void vertical(std::vector<std::string>& map, int x, int from, int to,
+              char tile = '#') {
+    for (int y = from; y <= to; ++y) map[y][x] = tile;
+}
+
+std::vector<std::string> treeTerrain(int width, int height) {
+    auto map = terrain(width, height);
+    // 盘根与树干围成开阔的王树广场，中间和东侧保留主通道。
+    horizontal(map, 3, 4, 10);
+    horizontal(map, 3, 25, 31);
+    vertical(map, 14, 2, 5);
+    vertical(map, 22, 9, 12);
+    horizontal(map, 11, 5, 10);
+    horizontal(map, 5, 27, 32);
+    scatter(map, '#', {{4, 4}, {10, 4}, {6, 10}, {12, 10},
+                       {26, 10}, {30, 11}, {32, 11}});
+    return map;
+}
+
+std::vector<std::string> forestTerrain(int width, int height) {
+    auto map = terrain(width, height);
+    // 成片果树形成弯曲林道，三处出口之间始终保留可达路线。
+    horizontal(map, 3, 7, 12);
+    horizontal(map, 3, 24, 29);
+    vertical(map, 16, 4, 6);
+    vertical(map, 25, 7, 10);
+    horizontal(map, 11, 5, 9);
+    horizontal(map, 12, 27, 32);
+    scatter(map, '#', {{8, 4}, {11, 4}, {15, 5}, {17, 5},
+                       {23, 9}, {28, 10}, {6, 12}, {12, 9},
+                       {30, 4}, {32, 8}});
+    return map;
+}
+
+std::vector<std::string> riverTerrain(int width, int height) {
+    auto map = terrain(width, height);
+    // 河道南北贯穿地图，在中央石桥处留出东西通路。
+    for (int y = 1; y < height - 1; ++y) {
+        if (y == 7) continue;
+        const int bend = y < 5 ? -1 : (y > 10 ? 1 : 0);
+        for (int x = 16 + bend; x <= 19 + bend; ++x) map[y][x] = '~';
+    }
+    horizontal(map, 3, 4, 6);
+    horizontal(map, 3, 8, 9);
+    horizontal(map, 12, 25, 31);
+    scatter(map, '#', {{6, 4}, {9, 4}, {11, 10}, {12, 11},
+                       {27, 3}, {30, 4}, {24, 10}});
+    return map;
+}
+
+std::vector<std::string> caveTerrain(int width, int height) {
+    auto map = terrain(width, height);
+    // 岩壁构成上下错落的洞道，仅北侧存在真实出口。
+    horizontal(map, 3, 3, 12);
+    horizontal(map, 3, 24, 32);
+    vertical(map, 8, 8, 12);
+    vertical(map, 27, 7, 11);
+    horizontal(map, 8, 12, 20);
+    horizontal(map, 12, 17, 24);
+    scatter(map, '#', {{14, 4}, {21, 4}, {5, 9}, {23, 10},
+                       {31, 9}, {12, 7}});
+    return map;
+}
+
+std::vector<std::string> baseTerrain(int width, int height) {
+    auto map = terrain(width, height);
+    // 金属隔墙划分实验区、控制区与中央走廊。
+    vertical(map, 9, 2, 5);
+    vertical(map, 9, 9, 12);
+    vertical(map, 24, 2, 5);
+    vertical(map, 24, 9, 12);
+    horizontal(map, 5, 10, 16);
+    horizontal(map, 5, 20, 23);
+    horizontal(map, 10, 13, 18);
+    horizontal(map, 10, 22, 23);
+    scatter(map, '#', {{15, 3}, {16, 3}, {20, 11}, {29, 4},
+                       {30, 4}, {31, 10}});
+    return map;
+}
+
 std::string itemTakenFlag(const std::string& roomId, const std::string& itemId) {
     return "flag_taken_" + roomId + "_" + itemId;
 }
@@ -93,10 +178,8 @@ std::string seasonRoom(int season) {
 
 InteractiveMap::InteractiveMap() {
     Definition tree;
-    tree.terrain = terrain(tree.width, tree.height);
+    tree.terrain = treeTerrain(tree.width, tree.height);
     tree.terrain[7][35] = 'D';
-    scatter(tree.terrain, '#', {{14, 3}, {14, 4}, {21, 9}, {22, 9},
-                                {7, 11}, {8, 11}, {27, 6}});
     tree.start = {17, 11};
     tree.doors[{35, 7}] = "east";
     tree.npcs[{7, 5}] = "npc_king";
@@ -106,13 +189,10 @@ InteractiveMap::InteractiveMap() {
     definitions_["room_tree"] = tree;
 
     Definition forest;
-    forest.terrain = terrain(forest.width, forest.height);
+    forest.terrain = forestTerrain(forest.width, forest.height);
     forest.terrain[7][0] = 'D';
     forest.terrain[7][35] = 'D';
     forest.terrain[14][18] = 'D';
-    scatter(forest.terrain, '#', {{8, 3}, {9, 3}, {15, 5}, {16, 5},
-                                  {26, 3}, {27, 3}, {6, 11}, {7, 11},
-                                  {28, 10}, {29, 10}});
     forest.start = {4, 7};
     forest.doors[{0, 7}] = "west";
     forest.doors[{35, 7}] = "east";
@@ -126,11 +206,9 @@ InteractiveMap::InteractiveMap() {
     definitions_["room_forest"] = forest;
 
     Definition river;
-    river.terrain = terrain(river.width, river.height);
+    river.terrain = riverTerrain(river.width, river.height);
     river.terrain[7][0] = 'D';
     river.terrain[7][35] = 'D';
-    for (int y = 2; y <= 12; ++y)
-        if (y != 7) for (int x = 16; x <= 19; ++x) river.terrain[y][x] = '~';
     river.start = {3, 7};
     river.doors[{0, 7}] = "west";
     river.doors[{35, 7}] = "east";
@@ -141,11 +219,8 @@ InteractiveMap::InteractiveMap() {
     definitions_["room_river"] = river;
 
     Definition cave;
-    cave.terrain = terrain(cave.width, cave.height);
+    cave.terrain = caveTerrain(cave.width, cave.height);
     cave.terrain[0][18] = 'D';
-    scatter(cave.terrain, '#', {{7, 3}, {8, 3}, {9, 3}, {25, 3},
-                                {26, 3}, {12, 8}, {13, 8}, {23, 11},
-                                {24, 11}, {25, 11}});
     cave.start = {18, 2};
     cave.doors[{18, 0}] = "north";
     cave.items[{9, 10}] = "item_flint";
@@ -155,10 +230,8 @@ InteractiveMap::InteractiveMap() {
     definitions_["room_cave"] = cave;
 
     Definition base;
-    base.terrain = terrain(base.width, base.height);
+    base.terrain = baseTerrain(base.width, base.height);
     base.terrain[7][0] = 'D';
-    scatter(base.terrain, '#', {{8, 5}, {8, 6}, {8, 7}, {15, 3},
-                                {16, 3}, {24, 10}, {25, 10}, {29, 4}});
     base.start = {3, 7};
     base.doors[{0, 7}] = "west";
     base.npcs[{27, 7}] = "npc_hertz";
@@ -543,7 +616,7 @@ MapTileVisual InteractiveMap::visualAt(int x, int y,
     const char tile = map->terrain[y][x];
     if (tile == '#') return {L"##", UI::Color::Wall};
     if (tile == '~') return {L"~~", UI::Color::Water};
-    return {L"·", UI::Color::Grass};
+    return {L"··", UI::Color::Grass};
 }
 
 std::string InteractiveMap::nearbyHint(const GameContext& ctx) const {
@@ -558,3 +631,9 @@ int InteractiveMap::height() const { const Definition* m = current(); return m ?
 int InteractiveMap::playerX() const { return player_.x; }
 int InteractiveMap::playerY() const { return player_.y; }
 const std::string& InteractiveMap::roomId() const { return roomId_; }
+char InteractiveMap::terrainAt(int x, int y) const {
+    const Definition* map = current();
+    if (map == nullptr || x < 0 || y < 0 || x >= map->width || y >= map->height)
+        return '\0';
+    return map->terrain[y][x];
+}

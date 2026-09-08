@@ -19,7 +19,7 @@
 
 未添加 getHP/getSP 等重复接口：读取既有 getHealth/getStamina/getWisdom/getStrength/getReputation。
 背包使用 getInventory().getItems().size() 显示“格数”，不是堆叠物品总数量。
-当前任务来自主循环既有 guide 文本；没有创建第二套 Task 或修改任务判定。
+当前任务来自主循环既有目标文本；没有创建第二套 Task 或修改任务判定。
 
 ## 坐标契约
 
@@ -52,7 +52,7 @@ SetConsoleCursorPosition / WriteConsoleW / SetConsoleTextAttribute 写入可见�
 输入使用 ReadConsoleInputW，关闭系统回显和自动换行。输入最长1024个片段；支持左右、
 Home/End、Backspace/Delete；长命令在输入行内横向滚动。Ctrl+C/Ctrl+Z 结束输入。
 窗口不足时显示提示，忽略游戏命令，等待调整窗口；退出恢复控制台模式、颜色、代码页和光标。
-任务过长时在自身区域换行并用省略号表示未显示部分，可用既有 guide 命令查看完整内容。
+任务过长时在自身区域换行并用省略号表示未显示部分，玩家直接查看右侧当前目标即可。
 
 ## 构建与自动回归
 

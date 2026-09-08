@@ -13,7 +13,7 @@ public:
     void appendLog(const std::string& utf8Text);
     void render(const GameContext& ctx,
                 const CombatSystem& combat,
-                const std::string& guideText);
+                const std::string& objectiveText);
     std::string readCommand();
     bool inputClosed() const;
     void restoreCursor();

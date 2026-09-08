@@ -860,10 +860,10 @@ ActionResult EventSystem::completeEvent(const Event& event,
     std::string playerMessage = message;
     if (event.kind == EventKind::Random) {
         playerMessage +=
-            "\n随机事件已经结束。下一步可输入“指引（guide）”查看主线目标。";
+            "\n随机事件已经结束，请查看右侧当前目标并继续探索。";
     } else if (event.eventId != "event_final_choice") {
         playerMessage +=
-            "\n下一步可输入“指引（guide）”查看新的主线目标。";
+            "\n新的主线目标已更新，请查看右侧当前目标。";
     }
     return makeResult(true,
                       playerMessage,

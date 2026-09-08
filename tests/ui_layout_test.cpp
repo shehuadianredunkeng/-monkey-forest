@@ -147,7 +147,7 @@ void readOnlyAdapter() {
     const auto view = UI::readGameView(ctx, false, L"当前主线：树冠试炼\n目标地点：果实森林（room_forest）\n输入 investigate");
     expect(view.health == 100 && view.stamina == 60 && view.wisdom == 1, "existing getter adapter");
     expect(view.inventorySlots == 1, "inventory count must use public getter");
-    expect(view.taskTitle == L"树冠试炼", "guide title adapter");
+    expect(view.taskTitle == L"树冠试炼", "objective title adapter");
     expect(view.taskHint.find(L"room_forest") == std::wstring::npos, "task must hide technical ID");
     expect(player.getHealth() == 100 && player.getStamina() == 60 && player.getWisdom() == 1 &&
            player.hasItem("item_chip") && world.getTurnCount() == 0 && world.getFlags().size() == 1,
