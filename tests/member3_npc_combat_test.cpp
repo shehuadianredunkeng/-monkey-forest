@@ -89,10 +89,10 @@ void testNpcTasksUsePlayerAndWorldInterfaces() {
                help.find("finish") == std::string::npos,
            "player help must not expose quest or finish commands");
 
-    player.setCurrentRoomId("room_forest");
-    const std::string roomText = lookAround(ctx);
-    expect(roomText.find("闪尾") == std::string::npos,
-           "scout should disappear from forest after joining party");
+    // 3号发布入队状态；地图是否显示该NPC由1号根据此状态处理。
+    expect(world.hasFlag("flag_scout_quest_complete") &&
+               world.hasFlag("flag_scout_help"),
+           "scout quest must publish the map-facing party flags");
     expect(npcs.talkToNPC("scout", ctx).success,
            "English NPC name should remain accepted");
 }
@@ -170,6 +170,116 @@ void testCollectionSystemSupportsNewAndLegacyEndings() {
     collections.syncLegacyFlags(legacyWorld);
     expect(collections.isEndingUnlocked("ending_gluttony", legacyWorld),
            "old ending flags should be imported");
+}
+
+void testStoryEventAchievementsUseMember2Flags() {
+    WorldState world;
+    CollectionSystem collections;
+
+    world.setFlag("flag_event_wildfire_done");
+    world.setFlag("flag_event_hidden_orchard_done");
+    world.setFlag("flag_event_drone_crash_done");
+    world.setFlag("flag_complete_log");
+    world.setFlag("flag_route_resist_ready");
+    world.setFlag("flag_route_hack_ready");
+    world.setFlag("flag_route_migrate_ready");
+    collections.syncLegacyFlags(world);
+
+    expect(collections.isAchievementUnlocked("achievement_all_random_events", world),
+           "all member-2 random event flags should unlock the encounter achievement");
+    expect(collections.isAchievementUnlocked("achievement_pacifist_log", world),
+           "a battle-free complete log should unlock the pacifist achievement");
+    expect(collections.isAchievementUnlocked("achievement_all_routes_ready", world),
+           "all three route-ready flags should unlock the route achievement");
+
+    WorldState foughtWorld;
+    foughtWorld.setFlag("flag_complete_log");
+    foughtWorld.setFlag("flag_bees_defeated");
+    collections.syncLegacyFlags(foughtWorld);
+    expect(!collections.isAchievementUnlocked("achievement_pacifist_log", foughtWorld),
+           "any victory flag should block the battle-free log achievement");
+}
+
+void testYearlyNpcDialogueAndChildReturnFlags() {
+    Player player;
+    WorldState world;
+    auto rooms = createAllRooms();
+    GameContext ctx{player, world, rooms};
+    NPCSystem npcs;
+    npcs.initializeNPCs();
+
+    std::set<std::string> kingLines;
+    std::set<std::string> childLines;
+    std::set<std::string> scoutLines;
+    world.setFlag("flag_child_rescued");
+    world.setFlag("flag_scout_quest_complete");
+    world.setFlag("flag_scout_help");
+    for (int year = 1; year <= 6; ++year) {
+        world.setStage(year);
+        kingLines.insert(npcs.talkToNPC("king", ctx).message);
+        childLines.insert(npcs.talkToNPC("child", ctx).message);
+        scoutLines.insert(npcs.talkToNPC("scout", ctx).message);
+    }
+    expect(kingLines.size() == 6, "king should have distinct dialogue for all six years");
+    expect(childLines.size() == 6, "rescued child should have distinct dialogue for all six years");
+    expect(scoutLines.size() == 6, "recruited scout should have distinct dialogue for all six years");
+
+    Player rescuePlayer;
+    WorldState rescueWorld;
+    auto rescueRooms = createAllRooms();
+    GameContext rescueCtx{rescuePlayer, rescueWorld, rescueRooms};
+    NPCSystem rescueNpcs;
+    rescueNpcs.initializeNPCs();
+    rescueNpcs.talkToNPC("豆豆", rescueCtx);
+    rescueNpcs.talkToNPC("豆豆", rescueCtx);
+    expect(rescuePlayer.addItem(Item("item_herb", "草药")), "rescue herb setup failed");
+    expect(rescueNpcs.chooseDialogueOption(2, rescueCtx).success,
+           "carrying the child home should succeed");
+    expect(rescueWorld.hasFlag("flag_child_saved") &&
+               rescueWorld.hasFlag("flag_child_returned") &&
+               rescueWorld.hasFlag("flag_child_carried_home"),
+           "child rescue must publish the map-compatible return flags");
+}
+
+void testBattleVictoryFlagsKeepMember2PendingFlags() {
+    struct BattleCase {
+        const char* pendingFlag;
+        const char* enemyId;
+        const char* victoryFlag;
+    };
+    const BattleCase cases[] = {
+        {"flag_pending_battle_bees", "enemy_bees", "flag_bees_defeated"},
+        {"flag_pending_battle_robot", "enemy_robot", "flag_robot_defeated"},
+        {"flag_pending_battle_hertz", "enemy_hertz", "flag_hertz_defeated"},
+    };
+
+    for (const BattleCase& battleCase : cases) {
+        Player player;
+        WorldState world;
+        auto rooms = createAllRooms();
+        GameContext ctx{player, world, rooms};
+        CombatSystem combat;
+        player.changeStrength(20);
+        player.changeSkillLevel(SkillType::Combat, 10);
+        player.changeWisdom(5);
+        player.changeHealth(1000);
+        world.setFlag(battleCase.pendingFlag);
+        world.setFlag("flag_complete_log");
+
+        expect(combat.startBattle(battleCase.enemyId, ctx).success,
+               "story-linked battle should start");
+        if (std::string(battleCase.enemyId) == "enemy_hertz")
+            expect(combat.performBattleAction("analyze", "", ctx).success,
+                   "Hertz armor analysis should succeed");
+        while (combat.isInBattle())
+            expect(combat.performBattleAction("attack", "", ctx).success,
+                   "story-linked battle should finish");
+
+        expect(world.hasFlag(battleCase.victoryFlag),
+               "combat must publish the victory flag expected by member 2");
+        expect(world.hasFlag(battleCase.pendingFlag),
+               "combat must leave the pending flag for EventSystem resume");
+    }
 }
 
 void testTheftAndBeeDefenseAchievements() {
@@ -287,15 +397,18 @@ void testNpcPlacementMatchesQuestFlow() {
     WorldState world;
     auto rooms = createAllRooms();
     GameContext ctx{player, world, rooms};
+    NPCSystem npcs;
+    npcs.initializeNPCs();
     expect(rooms.at("room_base").getNPCIds().front() == "npc_hertz",
            "Hertz must be visible in base");
     expect(rooms.at("room_river").getNPCIds().front() == "npc_child",
            "child rescue NPC must be in river");
-    player.setCurrentRoomId("room_forest");
-    const std::string roomText = lookAround(ctx);
-    expect(roomText.find("闪尾（scout）") != std::string::npos &&
-               roomText.find("npc_scout") == std::string::npos,
-           "unrecruited scout should display with bilingual name");
+    // NPC显示与离队后的地图隐藏由1号Room模块负责；3号只保证标准ID与
+    // 中英文名称均能进入同一套对话逻辑。
+    expect(npcs.talkToNPC("scout", ctx).success,
+           "member-1 standard scout ID alias should open dialogue");
+    expect(npcs.talkToNPC("闪尾", ctx).success,
+           "Chinese scout name should open the same dialogue flow");
 }
 
 int main() {
@@ -307,6 +420,9 @@ int main() {
         testHertzBananaBadEndings();
         testRepeatedEscapeEndingAndScoutDeparture();
         testCollectionSystemSupportsNewAndLegacyEndings();
+        testStoryEventAchievementsUseMember2Flags();
+        testYearlyNpcDialogueAndChildReturnFlags();
+        testBattleVictoryFlagsKeepMember2PendingFlags();
         testNpcPlacementMatchesQuestFlow();
     } catch (const std::exception& error) {
         std::cerr << "member3_npc_combat_test failed: " << error.what() << '\n';

@@ -14,6 +14,64 @@ constexpr const char* kEscapeSkill = "flag_skill_escape_unlocked";
 constexpr const char* kChildQuest = "flag_child_rescued";
 constexpr const char* kHealerQuest = "flag_healer_supplied";
 constexpr const char* kKingSupport = "flag_king_support";
+
+int storyYear(const WorldState& world) {
+    const int stage = world.getStage();
+    if (stage < 1) return 1;
+    if (stage > 6) return 6;
+    return stage;
+}
+
+std::string kingYearlyDialogue(const GameContext& ctx) {
+    switch (storyYear(ctx.world)) {
+    case 1:
+        return "岩背：第一片新叶已经张开。年轻的脚不能只踩熟悉的树枝，去果实森林看看，也学会为自己的选择负责。";
+    case 2:
+        return "岩背：秋风提前到了，粮仓却没有满。真正的守护不是喊得响，而是让每只幼猴都能熬过寒夜。";
+    case 3:
+        return ctx.world.hasFlag("flag_water_fixed")
+            ? "岩背：清泉重新流动了，可水里的蓝光不会说谎。顺着管线查下去，别让暂时的安稳蒙住眼睛。"
+            : "岩背：河谷的水正在变浅。先查清那道蓝光，再回来告诉我，这场灾祸究竟来自天意还是别的什么。";
+    case 4:
+        return "岩背：外敌还没露出全貌，猴群自己先吵成了一团。能压住争执的是拳头，能带大家走远的却是判断。";
+    case 5:
+        return ctx.world.hasFlag("flag_complete_log")
+            ? "岩背：日志已经说明一切。把你看见的真相记牢，最后的决定会让整个猴群承担后果。"
+            : "岩背：那座基地像一根扎进山里的刺。进去以后别只顾着逞强，带回能让所有猴子相信的证据。";
+    default:
+        return ctx.world.hasFlag(kKingSupport)
+            ? "岩背：我已经老了，但青木谷还年轻。今天由你站在最前面，我会让整个猴群站在你身后。"
+            : "岩背：最后的路已经摆在面前。若想让族群跟随你，就先让他们看见你一路留下的担当。";
+    }
+}
+
+std::string childYearlyDialogue(const WorldState& world) {
+    switch (storyYear(world)) {
+    case 1:
+        return "豆豆：腿已经不疼啦！不过叶婆婆说今天还不许我爬高。等我长大，也要像你一样把迷路的小猴背回家。";
+    case 2:
+        return "豆豆把半颗果子塞进你手里：我偷偷留的，不许告诉别人。冬天很冷，可两只吗喽分着吃就没那么冷啦。";
+    case 3:
+        return "豆豆：我听见河谷下面嗡嗡响。大家说小猴别管，可我觉得害怕的东西更应该弄明白。你调查时要小心呀。";
+    case 4:
+        return "豆豆：他们为什么总在吵谁对谁错？如果每只猴子都肯先分一颗果子，是不是就能坐下来慢慢说了？";
+    case 5:
+        return "豆豆攥住你的手指：基地里会不会很黑？这颗亮石送给你。它其实不会发光，但你可以假装它会。";
+    default:
+        return "豆豆仰头看着你：不管你最后选哪条路，我都记得你没有把我丢在河边。所以这一次，也别把自己丢下。";
+    }
+}
+
+std::string scoutYearlyDialogue(const WorldState& world) {
+    switch (storyYear(world)) {
+    case 1: return "闪尾：第一年就别皱着脸嘛。树梢风大，抓紧藤蔓，摔下来哥可只负责笑。";
+    case 2: return "闪尾：粮食不够就别硬撑。哥去远处探过路，真有危险喊一声，咱们先活着回来。";
+    case 3: return "闪尾：河谷那阵蓝光不对劲。哥在高处替你盯梢，你负责把藏在地下的秘密揪出来。";
+    case 4: return "闪尾：一群猴子吵起来比蜂群还响。你决定往哪边走，哥就先替你看看那条路会不会塌。";
+    case 5: return "闪尾：基地墙高得很，不过墙再高也拦不住会荡藤蔓的。逃跑不是认输，是给下次赢留条命。";
+    default: return "闪尾：都走到最后一年了，还客气什么？你冲你的，真撑不住就喊哥——咱俩一起荡出去。";
+    }
+}
 }
 
 void NPCSystem::initializeNPCs() {
@@ -59,20 +117,11 @@ ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
 
     std::string text;
     if (id == "npc_king") {
-        if (ctx.world.getStage() <= 2) {
-            text = ctx.world.hasFlag("flag_water_fixed")
-                ? "岩背：你让清泉重新流动了。继续追查蓝光，我开始相信你能保护大家。"
-                : "岩背：河谷的水正在消失。先查清蓝光管线，再谈守护整个猴群。";
-        } else if (ctx.world.hasFlag("flag_complete_log")) {
-            text = npcWillHelp(id, ctx)
-                ? "岩背：日志证明星猿正在掏空青木谷。我会召集猴群响应你的最终行动。"
-                : "岩背：证据足够，但族群还没有完全信任你。先帮助需要帮助的同伴。";
-        } else {
-            text = "岩背：河谷和山洞都出现了异常，去查清楚再回来。";
-        }
+        text = kingYearlyDialogue(ctx);
     } else if (id == "npc_scout") {
         if (ctx.world.hasFlag(kScoutQuest)) {
-            text = "闪尾：嘿！有事喊哥。真打不过就用“逃跑（escape）”，哥带你走！";
+            text = scoutYearlyDialogue(ctx.world) +
+                   "\n战斗中真撑不住就用“逃跑（escape）”，哥带你走！";
         } else if (!ctx.world.hasFlag(kScoutMet)) {
             ctx.world.setFlag(kScoutMet);
             text = "闪尾主动和你打招呼：嘿！小猴儿，有什么需要帮忙的找哥就是了，哥罩着你！\n"
@@ -99,7 +148,7 @@ ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
         }
     } else if (id == "npc_child") {
         if (ctx.world.hasFlag(kChildQuest)) {
-            text = "豆豆：谢谢你带我回来！我会乖乖留在猴王树。";
+            text = childYearlyDialogue(ctx.world);
         } else if (!ctx.world.hasFlag("flag_child_found")) {
             ctx.world.setFlag("flag_child_found");
             text = "你在河谷边找到了豆豆。她的腿被划伤，正强忍着眼泪。\n"
@@ -148,6 +197,8 @@ ActionResult NPCSystem::chooseNPCDialogue(const std::string& npcId,
         }
         ctx.player.removeItem("item_herb");
         ctx.world.setFlag(kChildQuest);
+        ctx.world.setFlag("flag_child_saved");
+        ctx.world.setFlag("flag_child_returned");
         ctx.player.changeReputation(15);
         if (option == 1) {
             ctx.world.setFlag("flag_healer_called_for_child");
@@ -156,6 +207,7 @@ ActionResult NPCSystem::chooseNPCDialogue(const std::string& npcId,
                     "你获得了豆豆的神秘祝福。",
                     true, false};
         }
+        ctx.world.setFlag("flag_child_carried_home");
         ctx.player.setCurrentRoomId("room_tree");
         return {true,
                 "你替豆豆包扎伤口，把她安全背回猴王树。声望+15。\n"

@@ -79,6 +79,9 @@ CollectionSystem::CollectionSystem() {
     registerAchievement({"achievement_no_rice", "巧妇难为无米之炊！", "", true});
     registerAchievement({"achievement_next_line_after_forest_fire", "放火烧山的下一句", "", true});
     registerAchievement({"achievement_no_monkey_at_tree", "猴王树查无此猴", "", true});
+    registerAchievement({"achievement_all_random_events", "青木谷奇遇录", "完成全部三项随机奇遇", true});
+    registerAchievement({"achievement_pacifist_log", "一拳未出", "未击败任何敌人便取得完整日志", true});
+    registerAchievement({"achievement_all_routes_ready", "三路皆通", "同时完成反击、智取与迁徙准备", true});
 }
 
 void CollectionSystem::registerEnding(const CollectionEntry& entry) {
@@ -127,6 +130,25 @@ void CollectionSystem::syncLegacyFlags(WorldState& world) const {
     };
     for (const auto& mapping : achievementFlags)
         if (world.hasFlag(mapping.first)) unlockAchievement(mapping.second, world);
+
+    if (world.hasFlag("flag_event_wildfire_done") &&
+        world.hasFlag("flag_event_hidden_orchard_done") &&
+        world.hasFlag("flag_event_drone_crash_done")) {
+        unlockAchievement("achievement_all_random_events", world);
+    }
+
+    if (world.hasFlag("flag_complete_log") &&
+        !world.hasFlag("flag_bees_defeated") &&
+        !world.hasFlag("flag_robot_defeated") &&
+        !world.hasFlag("flag_hertz_defeated")) {
+        unlockAchievement("achievement_pacifist_log", world);
+    }
+
+    if (world.hasFlag("flag_route_resist_ready") &&
+        world.hasFlag("flag_route_hack_ready") &&
+        world.hasFlag("flag_route_migrate_ready")) {
+        unlockAchievement("achievement_all_routes_ready", world);
+    }
 }
 
 bool CollectionSystem::isEndingUnlocked(const std::string& endingId,
