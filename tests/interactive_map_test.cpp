@@ -38,11 +38,16 @@ int main() {
         expect(roamingEnemies >= 2, "each turn should populate multiple enemies");
         expect(locationEvents == 1, "each room should expose one turn event");
 
+        const int staminaBeforeWalking = player.getStamina();
         for (int i = 0; i < 4; ++i) expect(map.move(0, -1, ctx).moved,
                                            "cannot reach tree corridor");
+        expect(player.getStamina() == staminaBeforeWalking,
+               "walking inside a room must not consume stamina");
         MapMoveResult transition;
         for (int i = 0; i < 18; ++i) transition = map.move(1, 0, ctx);
         expect(transition.roomChanged, "walking into door did not switch room");
+        expect(player.getStamina() == staminaBeforeWalking - 3,
+               "successful room transition must consume exactly three stamina");
         expect(player.getCurrentRoomId() == "room_forest",
                "door did not use room connection interface");
         expect(map.visualAt(18, 5, ctx).color == UI::Color::Quest,
@@ -79,6 +84,27 @@ int main() {
         caveMap.resetForRoom(caveCtx);
         expect(caveMap.visualAt(35, 7, caveCtx).glyph != L"门",
                "dead-end cave door should not be drawn");
+
+        Player tiredPlayer;
+        tiredPlayer.changeStamina(-58);
+        WorldState tiredWorld;
+        tiredWorld.setStage(1);
+        GameContext tiredCtx{tiredPlayer, tiredWorld, rooms};
+        InteractiveMap tiredMap;
+        tiredMap.resetForRoom(tiredCtx);
+        for (int i = 0; i < 4; ++i) tiredMap.move(0, -1, tiredCtx);
+        MapMoveResult blockedTransition;
+        for (int i = 0; i < 18; ++i)
+            blockedTransition = tiredMap.move(1, 0, tiredCtx);
+        expect(!blockedTransition.roomChanged,
+               "room transition must fail when stamina is below three");
+        expect(tiredPlayer.getCurrentRoomId() == "room_tree",
+               "failed transition must keep the current room");
+        expect(tiredPlayer.getStamina() == 2,
+               "failed transition must not consume stamina");
+        expect(blockedTransition.action.message.find("需要 3 点体力") !=
+                   std::string::npos,
+               "failed transition must explain the stamina requirement");
 
         std::cout << "interactive_map_test passed\n";
         return 0;

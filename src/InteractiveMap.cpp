@@ -382,6 +382,7 @@ bool InteractiveMap::questIsHere(const GameContext& ctx) const {
 }
 
 MapMoveResult InteractiveMap::move(int dx, int dy, GameContext& ctx) {
+    constexpr int ROOM_TRANSITION_STAMINA_COST = 3;
     MapMoveResult outcome;
     const Definition* map = current();
     if (map == nullptr) {
@@ -395,8 +396,25 @@ MapMoveResult InteractiveMap::move(int dx, int dy, GameContext& ctx) {
 
     const auto door = map->doors.find(target);
     if (door != map->doors.end()) {
+        if (ctx.player.getStamina() < ROOM_TRANSITION_STAMINA_COST) {
+            outcome.action = {
+                false,
+                "体力不足：切换地图需要 3 点体力，请先休息或使用恢复物品。",
+                false,
+                false
+            };
+            return outcome;
+        }
+
+        const int staminaBeforeMove = ctx.player.getStamina();
         outcome.action = movePlayer(ctx, door->second);
         if (outcome.action.success) {
+            // 旧的房间接口可能扣除 0 或 1 点体力；互动地图在这里统一
+            // 校正为“每次成功切换地图固定消耗 3 点”，避免重复扣除。
+            const int expectedStamina =
+                staminaBeforeMove - ROOM_TRANSITION_STAMINA_COST;
+            ctx.player.changeStamina(expectedStamina - ctx.player.getStamina());
+            outcome.action.message = "切换地图成功，消耗 3 点体力。";
             roomId_ = ctx.player.getCurrentRoomId();
             const Definition* destination = current();
             if (destination != nullptr)
