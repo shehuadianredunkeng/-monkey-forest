@@ -158,6 +158,10 @@ void InteractiveGameUI::drawStableLine(Rect area, SHORT y,
 void InteractiveGameUI::appendLog(const std::string& text) {
     historyScrollBack_ = 0;
     std::wstring wide = fromUtf8(text);
+    // 地图模块保留自身接口文本；显示层统一隐藏已取消的 guide 命令。
+    replaceAll(wide, L"可输入 guide 查看游戏进度", L"请查看右侧当前目标");
+    replaceAll(wide, L"可输入 guide 查看下一步路线",
+               L"请查看右侧当前目标确认下一步路线");
     replaceAll(wide, L"隐藏成就解锁：", L"\n【成就解锁】");
     replaceAll(wide, L"隐藏结局：", L"\n【结局达成】");
     replaceAll(wide, L"坏结局：", L"\n【结局达成】");
