@@ -1,0 +1,23 @@
+《吗喽森林：家园守卫战》全分支源码说明
+
+本压缩包保存了打包时 GitHub 上可见的全部有效分支源码，以及本地最新整合试玩版。
+
+一、成员分支
+- 1号：member-1-map（地图、房间连接、场景和移动）
+- 2号：member-2-story（六阶段主线、事件、路线和结局）
+- 3号：member-3-npc-combat（NPC、任务、敌人和战斗）
+- 4号：member-4-player（玩家属性、技能、背包和物品）
+- 5号：member-5-zip（存档、状态、资源、测试和联调）
+
+二、辅助分支
+- feat-coordinate-console-ui（控制台双栏坐标式UI）
+- first-year-ui-demo（第一年UI试玩版）
+- fix-wisdom-growth（智慧成长修复）
+
+三、最新本地整合版
+- local-interactive-map-demo
+- 包含互动地图、三存档位、动态季节与敌人、成就/结局收集、NPC与战斗改进
+- 包含本次文字排版、赫兹错位和四季Boss难度修复
+
+注意：各成员分支是协作时的独立代码快照，不保证每个分支单独就能直接运行。
+请试玩根目录中的 monkey_forest_interactive.exe；完整可运行源码请查看“当前整合试玩版”压缩包。

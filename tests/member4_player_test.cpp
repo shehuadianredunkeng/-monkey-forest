@@ -51,16 +51,16 @@ void testItemAndInventory()
            "Important item must be protected from deletion");
 
     Inventory full;
-    for (int i = 0; i < 8; ++i)
+    for (int i = 0; i < 12; ++i)
     {
         expect(full.addItem(Item("test_" + std::to_string(i), "测试物品")),
-               "Each of eight slots should be usable");
+               "Each of twelve slots should be usable");
     }
-    expect(full.isFull(), "Eight distinct IDs should fill the inventory");
+    expect(full.isFull(), "Twelve distinct IDs should fill the inventory");
     expect(full.addItem(Item("test_0", "测试物品", false, 2)),
            "Existing stacks should accept items when full");
-    expect(!full.addItem(Item("test_8", "额外物品")),
-           "Ninth distinct ID should be rejected");
+    expect(!full.addItem(Item("test_12", "额外物品")),
+           "Thirteenth distinct ID should be rejected");
 }
 
 void testPlayerState()
@@ -281,7 +281,7 @@ void testBatchPickupInRoomOrder()
 void testBatchPartialCapacity()
 {
     PickupFixture f({"item_fruit", "item_herb", "item_rope"});
-    fillSlots(f.player, 7);
+    fillSlots(f.player, 11);
     const auto result = takeItem("", f.context);
     expect(result.success && result.turnConsumed && f.player.hasItem("item_fruit") &&
                !f.player.hasItem("item_herb") && !f.player.hasItem("item_rope"),
@@ -296,18 +296,18 @@ void testBatchPartialCapacity()
 void testFullBagStillStacksAfterFailedNewItem()
 {
     PickupFixture f({"item_rope", "item_fruit"});
-    fillSlots(f.player, 7);
+    fillSlots(f.player, 11);
     expect(f.player.addItem(Item("item_fruit", "果实", 3)), "Add existing fruit stack");
     const auto result = takeItem("", f.context);
     expect(result.success && result.turnConsumed && countOf(f.player, "item_fruit") == 4 &&
-               !f.player.hasItem("item_rope") && f.player.getInventory().getItems().size() == 8,
+                !f.player.hasItem("item_rope") && f.player.getInventory().getItems().size() == 12,
            "Full bag must continue attempting later existing stacks");
 }
 
 void testBatchFullEmptyAndMissingRooms()
 {
     PickupFixture f({"item_fruit", "item_herb"});
-    fillSlots(f.player, 8);
+    fillSlots(f.player, 12);
     auto result = takeItem("", f.context);
     expect(!result.success && !result.turnConsumed && !result.stageCompleted &&
                !f.player.hasItem("item_fruit"), "No item obtained means no turn");
@@ -366,7 +366,7 @@ void testInventoryDisplayUsesCanonicalNamesAndSlots()
     player.addItem(Item("item_herb", "旧名", 2));
     player.addItem(Item("item_chip", "芯片", true, 1));
     const auto text = showInventory(player);
-    expect(text == "背包 3/8\n- 果实 x3 [fruit / 果实]\n- 草药 x2 [herb / 草药]\n- 星猿晶片 x1 [chip / 晶片]",
+    expect(text == "背包 3/12\n- 果实 x3 [fruit / 果实]\n- 草药 x2 [herb / 草药]\n- 星猿晶片 x1 [chip / 晶片]",
            "Bag must display canonical names, quantity, aliases and distinct slots");
     expect(text.find("item_") == std::string::npos, "Bag must not expose internal IDs");
     player.addItem(Item("item_rope", "绳索", true, 1));
@@ -381,7 +381,7 @@ void testInventoryDisplayUsesCanonicalNamesAndSlots()
 
 void testEmptyInventoryShowsZeroSlots()
 {
-    expect(showInventory(Player{}) == "背包 0/8\n背包为空。",
+    expect(showInventory(Player{}) == "背包 0/12\n背包为空。",
            "Empty inventory must show zero occupied slots in Chinese");
 }
 } // namespace
@@ -390,6 +390,10 @@ void testEmptyInventoryShowsZeroSlots()
 bool WorldState::hasFlag(const std::string&) const
 {
     return false;
+}
+int WorldState::getStage() const
+{
+    return 1;
 }
 #endif
 
