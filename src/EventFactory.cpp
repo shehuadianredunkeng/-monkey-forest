@@ -4,12 +4,16 @@
 
 using namespace std;
 
+//集中创建剧情模块使用的全部事件。
+
 map<string, Event> createAllEvents() {
     map<string, Event> events;
     auto add = [&events](Event event) {
         const string id = event.eventId;
         events.emplace(id, move(event));
     };
+
+    //树冠试炼是第一个主线选择，用来让玩家熟悉属性条件和战斗分支。
 
     add({
         "event_tree_trial",
@@ -25,6 +29,8 @@ map<string, Event> createAllEvents() {
         "flag_event_tree_trial_done", EventKind::Main, true
     });
 
+    //完成树冠试炼后进入冬季短缺，玩家的取舍会影响后续公共资源和猴群状态。
+
     add({
         "event_winter_shortage",
         "冬季短缺",
@@ -38,6 +44,8 @@ map<string, Event> createAllEvents() {
         },
         "flag_event_winter_shortage_done", EventKind::Main, true
     });
+
+    //先调查清泉河谷
 
     add({
         "event_glowing_river",
@@ -53,6 +61,8 @@ map<string, Event> createAllEvents() {
         "flag_event_glowing_river_done", EventKind::Main, false
     });
 
+    //修复水源后继续追踪管线，完成山洞调查才能获得后续线索。
+
     add({
         "event_echo_tracking",
         "回声追踪",
@@ -66,6 +76,8 @@ map<string, Event> createAllEvents() {
         },
         "flag_event_echo_tracking_done", EventKind::Main, true
     });
+
+    //从这里开始选择反击、技术或迁徙方向，但最终结局仍要结合后续准备判断。
 
     add({
         "event_drought_choice",
@@ -95,6 +107,8 @@ map<string, Event> createAllEvents() {
         "flag_event_group_dispute_done", EventKind::Main, true
     });
 
+    //基地潜入包含战斗、晶片研究和NPC协助三种处理方式。
+
     add({
         "event_base_infiltration",
         "基地潜入",
@@ -108,6 +122,9 @@ map<string, Event> createAllEvents() {
         },
         "flag_event_base_infiltration_done", EventKind::Main, true
     });
+
+    //最终事件汇总玩家此前的路线准备。
+    //这里提供结局选项，具体解锁判断和状态记录仍由世界状态模块统一处理。
 
     add({
         "event_final_choice",
@@ -123,6 +140,8 @@ map<string, Event> createAllEvents() {
         "flag_event_final_choice_done", EventKind::Main, true
     });
 
+    //以下为探索过程中可能触发的随机事件，它们提供额外资源和剧情变化，但不会直接推进主线阶段。
+    
     add({
         "event_wildfire",
         "山火",
