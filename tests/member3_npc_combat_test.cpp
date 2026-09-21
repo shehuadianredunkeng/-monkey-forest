@@ -90,7 +90,7 @@ void testNpcTasksUsePlayerAndWorldInterfaces() {
                help.find("finish") == string::npos,
            "player help must not expose quest or finish commands");
 
-    // 3号发布入队状态；地图是否显示该NPC由1号根据此状态处理。
+    // 发布入队状态，地图是否显示该NPC由1号据此状态处理
     expect(world.hasFlag("flag_scout_quest_complete") &&
                world.hasFlag("flag_scout_help"),
            "scout quest must publish the map-facing party flags");
@@ -215,7 +215,6 @@ void testCombatSkillUsesIncreasingVictoryThresholds() {
     auto rooms = createAllRooms();
     GameContext ctx{player, world, rooms};
     CombatSystem combat;
-    combat.initializeEnemies();
 
     for (int victory = 1; victory <= 26; ++victory) {
         const string encounter = "enemy_raider@training_" +
@@ -254,7 +253,6 @@ void testBattleStateCanResumeWithoutHealingEnemy() {
     auto rooms = createAllRooms();
     GameContext ctx{player, world, rooms};
     CombatSystem combat;
-    combat.initializeEnemies();
     expect(combat.startBattle("enemy_drone@room_river@3@3", ctx).success,
            "drone battle should start");
     expect(combat.performBattleAction("破解", "", ctx).success,
@@ -264,7 +262,6 @@ void testBattleStateCanResumeWithoutHealingEnemy() {
     combat.saveBattleState(world);
 
     CombatSystem restored;
-    restored.initializeEnemies();
     expect(restored.restoreBattleState(ctx), "saved battle should restore");
     expect(restored.isInBattle() &&
                restored.getBattleState().enemyHealth == savedEnemyHealth &&
@@ -427,7 +424,6 @@ void testEscapeSkillAndHertzBananaChoice() {
     auto rooms = createAllRooms();
     GameContext ctx{player, world, rooms};
     CombatSystem combat;
-    combat.initializeEnemies();
 
     expect(combat.startBattle("enemy_bees", ctx).success, "bees should start");
     expect(!combat.performBattleAction("逃跑", "", ctx).success,
@@ -457,7 +453,6 @@ void testHertzBananaBadEndings() {
     CombatSystem combat;
     world.setFlag("flag_scout_banana_promise");
     world.setFlag("flag_scout_help");
-    combat.initializeEnemies();
     expect(combat.startBattle("enemy_hertz", ctx).success, "Hertz should start");
     expect(combat.performBattleAction("banana", "2", ctx).success,
            "eating first banana should start greed loop");
@@ -506,7 +501,6 @@ void testRobotHackAndHertzArmor() {
     auto rooms = createAllRooms();
     GameContext ctx{player, world, rooms};
     CombatSystem combat;
-    combat.initializeEnemies();
 
     player.changeWisdom(2);
     expect(combat.startBattle("enemy_robot", ctx).success, "robot battle should start");
@@ -593,7 +587,6 @@ void testBattleActionsOnlyRefreshMapAfterLeavingBattle() {
         auto rooms = createAllRooms();
         GameContext ctx{player, world, rooms};
         CombatSystem combat;
-        combat.initializeEnemies();
         body(ctx, combat);
     };
 

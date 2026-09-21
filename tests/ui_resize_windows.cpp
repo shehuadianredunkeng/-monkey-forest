@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
         Player player; WorldState world; auto rooms=createAllRooms();
         GameContext ctx{player,world,rooms};
         InteractiveMap map; map.resetForRoom(ctx);
-        CombatSystem combat; combat.initializeEnemies();
+        CombatSystem combat;
         for (int i=0;i<60;++i) ui.appendLog("history "+to_string(i));
         for (auto size : {COORD{111,34},COORD{160,42},COORD{123,36},COORD{111,30},COORD{111,34}}) {
             SMALL_RECT window{0,0,SHORT(size.X-1),SHORT(size.Y-1)};

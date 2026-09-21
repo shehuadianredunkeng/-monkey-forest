@@ -34,7 +34,7 @@ void roundTrip(const string& enemy, const string& action) {
     GameContext ctx{player, world, rooms};
     player.changeWisdom(3);
     world.setFlag("flag_complete_log");
-    CombatSystem combat; combat.initializeEnemies();
+    CombatSystem combat;
     EventSystem events; events.initializeEvents(); ProgressSystem progress;
     InteractiveMap map; map.resetForRoom(ctx);
     SaveManager manager; SaveSlots slots("roundtrip_saves");
@@ -55,7 +55,7 @@ void roundTrip(const string& enemy, const string& action) {
     Player loaded; WorldState loadedWorld; auto loadedRooms = createAllRooms();
     GameContext loadCtx{loaded, loadedWorld, loadedRooms};
     expect(slots.load(1, loadCtx, manager), "file load failed");
-    CombatSystem restored; restored.initializeEnemies();
+    CombatSystem restored;
     expect(restored.restoreBattleState(loadCtx), "file battle restore failed");
     const auto after = restored.getBattleState();
     expect(after.enemyHealth == before.enemyHealth && loaded.getHealth() == hp,

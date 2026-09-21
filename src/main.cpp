@@ -427,7 +427,6 @@ GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
     NPCSystem npcs;
     npcs.initializeNPCs();
     CombatSystem combat;
-    combat.initializeEnemies();
     ProgressSystem progress;
     EndingSystem endings;
     InteractiveMap map;

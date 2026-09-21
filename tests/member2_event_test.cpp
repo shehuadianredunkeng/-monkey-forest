@@ -369,7 +369,6 @@ void testRealCombatBridge() {
     EventSystem events;
     CombatSystem combat;
     events.initializeEvents();
-    combat.initializeEnemies();
 
     player.setCurrentRoomId("room_forest");
     expect(events.triggerEvent("event_tree_trial", ctx).success,

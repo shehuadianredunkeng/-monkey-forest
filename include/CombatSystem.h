@@ -23,7 +23,6 @@ struct BattleState {
 class CombatSystem {
 public:
     CombatSystem();
-    void initializeEnemies();
 
     ActionResult startBattle(const string& enemyId, GameContext& ctx);
     ActionResult performBattleAction(const string& action,
@@ -38,6 +37,8 @@ public:
     void clearSavedBattleState(WorldState& world) const;//清除战斗中写入的存档旗标
 
 private:
+    void initializeEnemies();
+
     map<string, Enemy> enemies_;
     BattleState battleState_;
     int battleTurn_ = 0;

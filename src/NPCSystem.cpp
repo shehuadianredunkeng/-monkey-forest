@@ -15,7 +15,7 @@ constexpr const char* kChildQuest = "flag_child_rescued";
 constexpr const char* kHealerQuest = "flag_healer_supplied";
 constexpr const char* kKingSupport = "flag_king_support";
 
-//剧情年份限制在 1-6 年
+//1-3年6个阶段
 int storyYear(const WorldState& world) {
     const int stage = world.getStage();
     if (stage < 1) return 1;
@@ -57,7 +57,7 @@ string childYearlyDialogue(const WorldState& world) {
     case 4:
         return "豆豆：他们为什么总在吵谁对谁错？如果每只猴子都肯先分一颗果子，是不是就能坐下来慢慢说了？";
     case 5:
-        return "豆豆攥住你的手指：基地里会不会很黑？这颗亮石送给你。它其实不会发光，但你可以假装它会。";
+        return "豆豆攥住你的手指：基地里会不会很黑？这是我捉的萤火虫。";
     default:
         return "豆豆仰头看着你：不管你最后选哪条路，我都记得你没有把我丢在河边。所以这一次，也别把自己丢下。";
     }
@@ -105,7 +105,7 @@ ActionResult NPCSystem::talkToNPC(const string& npcId, GameContext& ctx) {
     if (!findNPC(id)) return {false, "这里没有这个角色。", false, false};
     activeDialogueNpcId_.clear();
 
-    // 玩家只需要持续使用“对话（talk）”：满足条件时自动提交并结算任务。
+    // 玩家只需持续使用对话就可以满足条件时自动提交并结算任务
     if (id == "npc_scout" && ctx.world.hasFlag(kScoutChoiceMade) &&
         !ctx.world.hasFlag(kScoutQuest) && ctx.player.hasItem("item_rope"))
         return completeNPCQuest(id, ctx);
@@ -259,7 +259,7 @@ bool NPCSystem::npcWillHelp(const string& npcId,
     if (id == "npc_child") return ctx.world.hasFlag(kChildQuest);
     if (id == "npc_hertz")
         return ctx.player.getWisdom() >= 4 && ctx.world.hasFlag("flag_complete_log");
-    return false;
+    return false;//npc触发对话与任务条件判定改了
 }
 
 string NPCSystem::getNPCQuest(const string& npcId,
@@ -304,7 +304,7 @@ ActionResult NPCSystem::completeNPCQuest(const string& npcId,
     }
     if (id == "npc_healer") {
         if (ctx.world.hasFlag(kHealerQuest))
-            return {false, "叶婆婆的任务已经完成。", false, false};
+            return {false, "任务已完成。", false, false};
         if (!ctx.player.hasItem("item_herb"))
             return {false, "你还没有带回草药。", false, false};
         ctx.player.removeItem("item_herb");

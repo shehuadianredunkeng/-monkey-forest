@@ -179,7 +179,6 @@ void interactiveSidebarAndChoiceColors() {
     InteractiveMap map;
     map.resetForRoom(ctx);
     CombatSystem combat;
-    combat.initializeEnemies();
 
     ui.appendLog("请选择：\n1. 接受香蕉（力量路线）\n2. 拒绝香蕉（智慧路线）");
     expect(ui.render(ctx, map, combat, "前往果实森林"),
@@ -254,7 +253,7 @@ void responsiveFrameCases() {
     Player player; WorldState world; auto rooms = createAllRooms();
     GameContext ctx{player, world, rooms};
     InteractiveMap map; map.resetForRoom(ctx);
-    CombatSystem combat; combat.initializeEnemies();
+    CombatSystem combat;
     for (int i = 0; i < 60; ++i) ui.appendLog("history " + to_string(i));
     for (const auto size : {UI::Rect{0,0,110,33}, UI::Rect{0,0,159,41},
                             UI::Rect{0,0,122,35}, UI::Rect{0,0,110,29}, UI::Rect{0,0,110,33}}) {
