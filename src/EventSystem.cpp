@@ -129,6 +129,8 @@ bool EventSystem::canTriggerEvent(const string& eventId,
     return true;
 }
 
+//这里只根据当前阶段和前置条件寻找主线目标。
+
 const Event* EventSystem::findRecommendedMainEvent(
     const GameContext& ctx,
     bool requireCurrentRoom) const {
@@ -257,6 +259,8 @@ ActionResult EventSystem::triggerAvailableMainEvent(GameContext& ctx) {
     return triggerEvent(event->eventId, ctx);
 }
 
+//战斗模块负责记录胜利结果，这里检查对应胜利旗标。
+
 ActionResult EventSystem::resumePendingEventAfterBattle(GameContext& ctx) {
     const bool beesReady =
         ctx.world.hasFlag("flag_pending_battle_bees") &&
@@ -342,6 +346,8 @@ ActionResult EventSystem::resolveChoice(const Event& event,
     Player& player = ctx.player;
     WorldState& world = ctx.world;
 
+     //树冠试炼
+
     if (event.eventId == "event_tree_trial") {
         if (option == 1) {
             if (!world.hasFlag("flag_bees_defeated")) {
@@ -422,6 +428,8 @@ ActionResult EventSystem::resolveChoice(const Event& event,
             ctx);
     }
 
+    //清泉河谷调查
+
     if (event.eventId == "event_glowing_river") {
         if (option == 1) {
             if (player.getStrength() < 2 || player.getStamina() < 10) {
@@ -464,6 +472,8 @@ ActionResult EventSystem::resolveChoice(const Event& event,
             "猴群共同挖通新水道。声望+5，公共水源+5，士气+5。",
             ctx);
     }
+
+    //回声山洞
 
     if (event.eventId == "event_echo_tracking") {
         if (option == 1) {
@@ -607,6 +617,8 @@ ActionResult EventSystem::resolveChoice(const Event& event,
             routeResult + "实验基地路线已经开放。",
             ctx);
     }
+   
+    //侦察机与晶片研究
 
     if (event.eventId == "event_base_infiltration") {
         if (option == 1) {
