@@ -17,11 +17,9 @@ public:
                 const CombatSystem& combat,
                 const string& objectiveText);
     string readCommand();
-    bool inputClosed() const;
     void restoreCursor();
 
 private:
     UI::ConsoleRenderer renderer_;
     UI::GameUI gameUI_;
-    bool inputClosed_ = false;
 };

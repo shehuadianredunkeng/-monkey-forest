@@ -6,9 +6,7 @@
 #include "WorldState.h"
 
 #include <algorithm>
-#include <initializer_list>
 #include <sstream>
-#include <utility>
 
 using namespace std;
 
@@ -247,6 +245,7 @@ void InteractiveMap::resetForRoom(const GameContext& ctx,
                   ? map->start
                   : spawnAfterTransition(*map, enteredByDirection);
     if (enteredByDirection.empty()) {
+        // 读档时回到上次保存的位置。
         const string prefix = "flag_map_position_" + roomId_ + "_";
         for (const string& flag : ctx.world.getFlags()) {
             if (flag.rfind(prefix, 0) != 0) continue;
@@ -268,6 +267,7 @@ void InteractiveMap::ensureCurrentRoom(const GameContext& ctx) {
 }
 
 void InteractiveMap::storePosition(GameContext& ctx) const {
+    // 存档只记录当前这一个位置。
     for (const string& flag : ctx.world.getFlags())
         if (flag.rfind("flag_map_position_", 0) == 0)
             ctx.world.removeFlag(flag);
@@ -449,7 +449,7 @@ bool InteractiveMap::questIsHere(const GameContext& ctx) const {
 
 MapMoveResult InteractiveMap::move(int dx, int dy, GameContext& ctx) {
     MapMoveResult outcome;
-    // 只接受水平或垂直的单格移动，防止跳格、斜向和原地输入。
+    // 地图里只能上下左右走一格。
     if ((dx == 0 && dy == 0) || (dx != 0 && dy != 0) ||
         dx < -1 || dx > 1 || dy < -1 || dy > 1)
         return outcome;
@@ -466,7 +466,6 @@ MapMoveResult InteractiveMap::move(int dx, int dy, GameContext& ctx) {
 
     const auto door = map->doors.find(target);
     if (door != map->doors.end()) {
-        // movePlayer 统一检查并扣除3点体力，这里不重复处理。
         outcome.action = movePlayer(ctx, door->second);
         if (outcome.action.success) {
             outcome.action.message = "切换地图成功，消耗 3 点体力。";

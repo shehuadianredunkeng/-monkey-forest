@@ -125,8 +125,7 @@ void testPlayerActions()
                        "树冠上的家。",
                        {},
                        {},
-                       {"item_fruit", "item_herb", "item_chip"},
-                       "观察四周"));
+                       {"item_fruit", "item_herb", "item_chip"}));
     GameContext context{player, world, rooms};
 
     const ActionResult take = takeItem("item_fruit", context);
@@ -167,7 +166,7 @@ struct PickupFixture
     explicit PickupFixture(vector<string> ids)
     {
         rooms.emplace("room_tree", Room("room_tree", "树屋", "", {}, {},
-                                         move(ids), ""));
+                                         move(ids)));
     }
 };
 

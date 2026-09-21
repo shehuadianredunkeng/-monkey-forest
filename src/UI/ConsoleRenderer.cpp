@@ -278,7 +278,7 @@ vector<wstring> ConsoleRenderer::wrapText(const wstring& text, int count) {
     return UI::wrapText(text, count, [this](const wstring& g) { return surface_->measure(g); });
 }
 void ConsoleRenderer::drawTextIn(Rect area, SHORT x, SHORT y, const wstring& text, Color color) {
-    // 调用方传进来的裁剪区再大，也要按全局边框压回去。
+    // 文字不能盖住边框。
     if (y <= 0 || y >= static_cast<SHORT>(height_ - 1) || y == inputTop() || x <= 0 || x >= width_) return;
     area.left = max<SHORT>(area.left, 1);
     area.right = min<SHORT>(area.right, static_cast<SHORT>(width_ - 1));

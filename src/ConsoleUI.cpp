@@ -15,8 +15,6 @@ void ConsoleUI::render(const GameContext& ctx, const CombatSystem& combat, const
 }
 string ConsoleUI::readCommand() {
     const auto command = gameUI_.readCommand();
-    inputClosed_ = !command;
     return command ? UI::toUtf8(*command) : string{};
 }
-bool ConsoleUI::inputClosed() const { return inputClosed_; }
 void ConsoleUI::restoreCursor() { renderer_.restore(); }

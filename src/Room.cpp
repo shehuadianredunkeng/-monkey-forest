@@ -113,15 +113,13 @@ Room::Room(string id,
            string baseDescription,
            map<string, string> exits,
            vector<string> npcIds,
-           vector<string> itemIds,
-           string recommendedAction)
+           vector<string> itemIds)
     : id_(move(id)),
       name_(move(name)),
       baseDescription_(move(baseDescription)),
       exits_(move(exits)),
       npcIds_(move(npcIds)),
-      itemIds_(move(itemIds)),
-      recommendedAction_(move(recommendedAction)) {}
+      itemIds_(move(itemIds)) {}
 
 const string& Room::getId() const { return id_; }
 const string& Room::getName() const { return name_; }
@@ -129,11 +127,11 @@ const string& Room::getBaseDescription() const { return baseDescription_; }
 const map<string, string>& Room::getExits() const { return exits_; }
 const vector<string>& Room::getNPCIds() const { return npcIds_; }
 const vector<string>& Room::getItemIds() const { return itemIds_; }
-const string& Room::getRecommendedAction() const { return recommendedAction_; }
 
 vector<string> Room::getVisibleItemIds(const GameContext& context) const {
     vector<string> visible;
 
+    // 已经拿走的物品不再显示。
     for (const string& itemId : itemIds_) {
         const string takenFlag = "flag_taken_" + id_ + "_" + itemId;
         if (!context.world.hasFlag(takenFlag)) {
@@ -148,6 +146,7 @@ vector<string> Room::getVisibleNPCIds(const GameContext& context) const {
     vector<string> visible = npcIds_;
     const bool childReturned = childReturnedToTree(context.world);
 
+    // 豆豆救出后会回到猴王树。
     if (id_ == "room_river" && childReturned) {
         visible.erase(
             remove(visible.begin(), visible.end(), "npc_child"),
@@ -247,33 +246,28 @@ map<string, Room> createAllRooms() {
         {"room_tree", Room{"room_tree", "猴王树",
             "巨大的猴王树守望着整片家园，枝叶间传来同伴的呼唤。",
             {{"east", "room_forest"}},
-            {"npc_king", "npc_healer"}, {},
-            "提示：先与猴王岩背交谈。"}},
+            {"npc_king", "npc_healer"}, {}}},
 
         {"room_forest", Room{"room_forest", "果实森林",
             "成熟果实散发清甜气味，树冠间有一条通往河谷的高处捷径。",
-            {{"west", "room_tree"}, {"east", "room_river"},
-             {"south", "room_cave"}, {"up", "room_river"}},
-            {"npc_scout"}, {"item_fruit", "item_rope"},
-            "提示：收集资源并调查森林。"}},
+             {{"west", "room_tree"}, {"east", "room_river"},
+              {"south", "room_cave"}, {"up", "room_river"}},
+            {"npc_scout"}, {"item_fruit", "item_rope"}}},
 
         {"room_river", Room{"room_river", "清泉河谷",
             "河谷的水流被银色管道截断，只剩浅浅的水洼。",
             {{"west", "room_forest"}, {"east", "room_base"}},
-            {"npc_child"}, {"item_herb"},
-            "提示：调查异常管道。"}},
+            {"npc_child"}, {"item_herb"}}},
 
         {"room_cave", Room{"room_cave", "回声山洞",
             "潮湿的洞壁把每一步脚步声放大，深处隐约传来机械回响。",
             {{"north", "room_forest"}, {"east", "room_base"}},
-            {}, {"item_flint", "item_chip"},
-            "提示：分析回声线索。"}},
+            {}, {"item_flint", "item_chip"}}},
 
         {"room_base", Room{"room_base", "废弃实验基地",
             "锈蚀的金属门半掩着，冷光从基地深处的控制台泄出。人员撤离后，自动防御系统仍在运行。",
             {{"west", "room_river"}, {"north", "room_cave"}},
-            {"npc_hertz"}, {},
-            "提示：调查基地入口。"}}
+            {"npc_hertz"}, {}}}
     };
 }
 

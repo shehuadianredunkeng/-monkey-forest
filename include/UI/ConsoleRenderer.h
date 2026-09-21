@@ -67,7 +67,6 @@ public:
     void drawText(SHORT x, SHORT y, wstring text, Color color = Color::Normal);
     void drawTextIn(Rect area, SHORT x, SHORT y, const wstring& text, Color color);
     void drawOverlayText(SHORT x, SHORT y, wstring text, Color color = Color::Normal);
-    void drawOverlayTextIn(Rect area, SHORT x, SHORT y, const wstring& text, Color color);
     void drawHorizontalLine(SHORT y = 0, SHORT from = 0, SHORT to = -1);
     void drawVerticalLine(SHORT x = DIVIDER_X, SHORT from = 0, SHORT to = -1);
     void drawFrame();
@@ -78,6 +77,9 @@ public:
     InputEvent readEvent();
     void restore();
 private:
+    void drawOverlayTextIn(Rect area, SHORT x, SHORT y, const wstring& text,
+                           Color color);
+
     unique_ptr<ConsoleSurface> surface_;
     bool frameReady_ = false;
     bool frameCleared_ = false;
