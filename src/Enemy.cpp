@@ -1,10 +1,9 @@
 #include "Enemy.h"
-
 #include <algorithm>
 #include <utility>
-
 using namespace std;
 
+//数值设下限，防止数据配错
 Enemy::Enemy(string id, string name,
              int maxHealth, int attack, int defense, int reputationReward)
     : Character(move(id), move(name)),

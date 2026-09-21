@@ -1,7 +1,5 @@
 #pragma once
-
 #include "Character.h"
-
 using namespace std;
 
 class Enemy : public Character {
@@ -20,4 +18,4 @@ private:
     int attack_ = 1;
     int defense_ = 0;
     int reputationReward_ = 0;
-};
+};//血攻防奖

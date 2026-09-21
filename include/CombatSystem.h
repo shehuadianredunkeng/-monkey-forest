@@ -1,11 +1,9 @@
 #pragma once
-
+//防止重复定义
 #include <map>
 #include <string>
-
 #include "Enemy.h"
 #include "CommonTypes.h"
-
 using namespace std;
 
 struct BattleState {
@@ -25,7 +23,6 @@ struct BattleState {
 class CombatSystem {
 public:
     CombatSystem();
-
     void initializeEnemies();
 
     ActionResult startBattle(const string& enemyId, GameContext& ctx);
@@ -38,7 +35,7 @@ public:
     bool isInBattle() const;
     void saveBattleState(WorldState& world) const;
     bool restoreBattleState(GameContext& ctx);
-    void clearSavedBattleState(WorldState& world) const;
+    void clearSavedBattleState(WorldState& world) const;//清除战斗中写入的存档旗标
 
 private:
     map<string, Enemy> enemies_;

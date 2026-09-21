@@ -1,9 +1,7 @@
 #include "NPCSystem.h"
 #include "CollectionSystem.h"
-
 #include "Player.h"
 #include "WorldState.h"
-
 using namespace std;
 
 namespace {
@@ -17,6 +15,7 @@ constexpr const char* kChildQuest = "flag_child_rescued";
 constexpr const char* kHealerQuest = "flag_healer_supplied";
 constexpr const char* kKingSupport = "flag_king_support";
 
+//剧情年份限制在 1-6 年
 int storyYear(const WorldState& world) {
     const int stage = world.getStage();
     if (stage < 1) return 1;

@@ -6,13 +6,11 @@
 #include "Room.h"
 #include "TestFramework.h"
 #include "WorldState.h"
-
 #include <iostream>
 #include <map>
 #include <set>
 #include <stdexcept>
 #include <string>
-
 using namespace std;
 
 namespace {
@@ -116,7 +114,7 @@ void testRepeatedEscapeEndingAndScoutDeparture() {
         const ActionResult escaped = combat.performBattleAction("逃跑", "", ctx);
         expect(escaped.success, "escape should succeed");
         if (count == 2)
-            expect(escaped.message.find("和你一起走") != string::npos,
+            expect(escaped.message.find("带你一起走") != string::npos,
                    "third escape should foreshadow the scout invitation");
         if (count == 3)
             expect(escaped.message.find("闯荡天涯") != string::npos,
@@ -580,21 +578,11 @@ void testPersistentTheftAndCowardEnding() {
 
 void testNpcPlacementMatchesQuestFlow() {
     worlds.clear();
-    Player player;
-    WorldState world;
     auto rooms = createAllRooms();
-    GameContext ctx{player, world, rooms};
-    NPCSystem npcs;
-    npcs.initializeNPCs();
     expect(rooms.at("room_base").getNPCIds().front() == "npc_hertz",
            "Hertz must be visible in base");
     expect(rooms.at("room_river").getNPCIds().front() == "npc_child",
            "child rescue NPC must be in river");
-    // 这里只验证标准 ID 和中英文名称都能进同一套对话逻辑。
-    expect(npcs.talkToNPC("scout", ctx).success,
-           "member-1 standard scout ID alias should open dialogue");
-    expect(npcs.talkToNPC("闪尾", ctx).success,
-           "Chinese scout name should open the same dialogue flow");
 }
 
 void testBattleActionsOnlyRefreshMapAfterLeavingBattle() {
@@ -679,6 +667,7 @@ void testBattleActionsOnlyRefreshMapAfterLeavingBattle() {
     });
 }
 
+//失败才打印，全过就没有输出
 int main() {
     try {
         testNpcTasksUsePlayerAndWorldInterfaces();

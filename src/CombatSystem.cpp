@@ -1,17 +1,14 @@
 #include "CombatSystem.h"
 #include "CollectionSystem.h"
 #include "CommonUtils.h"
-
 #include "Player.h"
 #include "PlayerActions.h"
 #include "Item.h"
 #include "WorldState.h"
-
 #include <algorithm>
 #include <random>
 #include <sstream>
 #include <string>
-
 using namespace std;
 
 namespace {
@@ -33,7 +30,7 @@ int escapeCount(const WorldState& world) {
     int count = 0;
     for (int i = 1; i <= 7; ++i)
         if (world.hasFlag("flag_escape_count_" + to_string(i))) count = i;
-    // 兼容试玩版旧存档。
+    // 兼容试玩版旧档
     if (count == 0 && world.hasFlag("flag_escape_used_1")) count = 1;
     if (count <= 1 && world.hasFlag("flag_escape_used_2")) count = 2;
     if (count <= 2 && world.hasFlag("flag_escape_used_3")) count = 3;
@@ -48,12 +45,6 @@ string flagSuffix(const WorldState& world, const string& prefix) {
     return "";
 }
 
-int flagNumber(const WorldState& world, const string& prefix,
-               int fallback) {
-    const string value = flagSuffix(world, prefix);
-    return value.empty() ? fallback : stoi(value);
-}
-
 int combatVictoryCount(const WorldState& world) {
     int explicitCount = 0;
     for (int i = 1; i <= 26; ++i) {
@@ -62,7 +53,7 @@ int combatVictoryCount(const WorldState& world) {
     }
     if (explicitCount > 0) return explicitCount;
 
-    // 旧存档没有累计胜场字段，用已经击败的敌人旗标作为初始值。
+    // 旧存档没有累计胜场字段，用已击败的敌人旗标作为初始值
     int legacyCount = 0;
     for (const string& flag : world.getFlags()) {
         if (flag == "flag_bees_defeated" ||
@@ -83,8 +74,8 @@ string recordCombatVictory(GameContext& ctx) {
     ctx.world.setFlag("flag_combat_victory_count_" +
                       to_string(victories));
 
-    // 初始为1级；之后每级分别需5、6、7、8场，
-    // 即累计5/11/18/26场到达2/3/4/5级。9场档位因等级上限5而不再执行。
+    // 初始为1级；之后每级分别需5、6、7、8场
+    // 即累计5/11/18/26场到达2/3/4/5级
     int earnedLevel = 1;
     if (victories >= 5) earnedLevel = 2;
     if (victories >= 11) earnedLevel = 3;
@@ -448,9 +439,9 @@ ActionResult CombatSystem::performBattleAction(const string& action,
             !ctx.world.hasFlag("flag_scout_wander_invitation_resolved"))
             return {true,
                     "闪尾从天而降，抓起你就荡着藤蔓跑了。\n"
-                    "落地后，他拍了拍你的肩膀，难得没有开玩笑："
-                    "“小猴儿，要是我想和你一起走，你愿意吗？”\n"
-                    "他没有等你回答，只说下次再告诉他。",
+                    "落地后，他戳了戳你的肩膀，开玩笑似的问你："
+                    "“诶小猴儿，要是我想带你一起走，你愿意吗？”\n"
+                    "你愣了愣。闪尾见你怔住，噗嗤一声笑了，“说说而已，看把你吓得，没出息。”",
                     true, false};
         if (count == 4 && scoutPresent &&
             !ctx.world.hasFlag("flag_scout_wander_invitation_resolved")) {
@@ -458,7 +449,7 @@ ActionResult CombatSystem::performBattleAction(const string& action,
             return {true,
                     "闪尾从天而降，抓起你就荡着藤蔓跑了。\n"
                     "落地后，闪尾忽然认真起来：小猴儿，咱俩配合这么默契，"
-                    "干脆别守在这一棵树上了。跟哥一起闯荡天涯，怎么样？\n"
+                    "干脆别守在这一棵树上了。我带你走，咱一起闯荡天涯，怎么样？\n"
                     "1. 接受\n2. 拒绝\n请直接输入 1 或 2。",
                     true, false};
         }
@@ -563,7 +554,7 @@ ActionResult CombatSystem::handleTheft(GameContext& ctx) {
     } else if (battleState_.enemyId == "enemy_robot") {
         ctx.player.addItem(Item("item_material_fragment", "材料碎片"));
         ctx.player.changeStrength(1);
-        reward = "你拆下一块材料碎片，力量+1，并获得材料碎片。";
+        reward = "你扒下一块材料碎片，力量+1，并获得材料碎片。";
     } else if (battleState_.enemyId == "enemy_hertz") {
         ctx.player.addItem(Item("item_book", "星猿研究手册"));
         ctx.player.changeWisdom(1);
@@ -670,7 +661,7 @@ ActionResult CombatSystem::handleBananaChoice(const string& target,
             return {false, "香味让你挪不开眼。拒绝香蕉需要智慧≥3。", false, false};
         battleState_.awaitingBananaChoice = false;
         ctx.world.setFlag("flag_banana_refused");
-        return {true, "你识破了诱惑，果断拒绝巴拿拿。可以继续战斗。", false, false};
+        return {true, "你一爪子排开了巴拿拿，赫兹震惊地看着你。继续战斗。", false, false};
     }
 
     battleState_.awaitingBananaChoice = false;
@@ -684,7 +675,7 @@ ActionResult CombatSystem::handleBananaChoice(const string& target,
                 true, true};
     }
     hit.message = "你咬下一大口巴拿拿，注意力完全被香甜味道占据。\n" + hit.message +
-                  "\n赫兹又递来一根：1. 继续吃　2. 不吃了";
+                  "\n赫兹怜爱地又递来一根：1. 继续吃　2. 不吃了";
     return hit;
 }
 
@@ -692,7 +683,7 @@ ActionResult CombatSystem::enemyCounterAttack(GameContext& ctx, bool guarded) {
     const Enemy* enemy = currentEnemy();
     if (!enemy) return {false, "敌人数据不存在。", false, false};
     string blessing;
-    // 选择沉迷香蕉后必须完整承担该路线后果，豆豆祝福不在此路线中打断结局。
+    // 选择沉迷香蕉后必须完整承担该路线后果，豆豆祝福不在此路线中打断结局
     if (ctx.world.hasFlag("flag_child_rescued") && !battleState_.bananaGreedLoop) {
         const int roll = randomPercent();
         if (roll <= 26)
@@ -825,23 +816,20 @@ void CombatSystem::saveBattleState(WorldState& world) const {
 bool CombatSystem::restoreBattleState(GameContext& ctx) {
     const string enemyId = flagSuffix(
         ctx.world, string(SAVED_BATTLE_PREFIX) + "enemy_");
-    const auto enemy = enemies_.find(enemyId);
-    if (enemy == enemies_.end()) return false;
+    if (!enemies_.count(enemyId)) return false;
     battleState_ = BattleState{};
     battleState_.inBattle = true;
     battleState_.enemyId = enemyId;
     battleState_.encounterId = flagSuffix(
         ctx.world, string(SAVED_BATTLE_PREFIX) + "encounter_");
-    battleState_.enemyHealth = clamp(
-        flagNumber(ctx.world, string(SAVED_BATTLE_PREFIX) + "health_",
-                   enemy->second.getMaxHealth()),
-        1, enemy->second.getMaxHealth());
-    battleTurn_ = max(0, flagNumber(
-        ctx.world, string(SAVED_BATTLE_PREFIX) + "turn_", 0));
-    battleState_.consecutiveGuards = max(0, flagNumber(
-        ctx.world, string(SAVED_BATTLE_PREFIX) + "guards_", 0));
-    battleState_.doubleDamageTurns = max(0, flagNumber(
-        ctx.world, string(SAVED_BATTLE_PREFIX) + "double_", 0));
+    battleState_.enemyHealth = stoi(flagSuffix(
+        ctx.world, string(SAVED_BATTLE_PREFIX) + "health_"));
+    battleTurn_ = stoi(flagSuffix(
+        ctx.world, string(SAVED_BATTLE_PREFIX) + "turn_"));
+    battleState_.consecutiveGuards = stoi(flagSuffix(
+        ctx.world, string(SAVED_BATTLE_PREFIX) + "guards_"));
+    battleState_.doubleDamageTurns = stoi(flagSuffix(
+        ctx.world, string(SAVED_BATTLE_PREFIX) + "double_"));
     battleState_.playerGuarding = ctx.world.hasFlag(
         string(SAVED_BATTLE_PREFIX) + "player_guarding");
     battleState_.awaitingBananaChoice = ctx.world.hasFlag(
@@ -857,6 +845,7 @@ bool CombatSystem::restoreBattleState(GameContext& ctx) {
     return true;
 }
 
+//战斗状态分散在三处别漏
 void CombatSystem::clearBattle() {
     battleState_ = BattleState{};
     battleTurn_ = 0;

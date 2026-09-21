@@ -1,14 +1,12 @@
 #include "CollectionSystem.h"
-
 #include "StoryText.h"
 #include "WorldState.h"
-
 #include <algorithm>
 #include <sstream>
-
 using namespace std;
 
 namespace {
+//函数内静态变量，整个程序只有一份
 vector<CollectionEntry>& endingRegistry() {
     static vector<CollectionEntry> entries;
     return entries;
