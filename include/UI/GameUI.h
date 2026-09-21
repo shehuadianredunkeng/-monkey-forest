@@ -2,7 +2,10 @@
 
 #include "UI/ConsoleRenderer.h"
 
+#include <cstddef>
 #include <optional>
+#include <string>
+#include <vector>
 
 using namespace std;
 

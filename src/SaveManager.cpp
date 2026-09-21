@@ -155,9 +155,9 @@ bool SaveManager::loadGame(const string& path, GameContext& ctx) const {
     }
 
     string header;
-    int version = 0;
-    if (!(in >> header >> version) || header != "monkey_forest_save" ||
-        version != 1) {
+    int fileVersion = 0;
+    if (!(in >> header >> fileVersion) || header != "monkey_forest_save" ||
+        fileVersion != 1) {
         return false;
     }
 
@@ -165,26 +165,28 @@ bool SaveManager::loadGame(const string& path, GameContext& ctx) const {
     PlayerSnapshot snapshot;
 
     string key;
+    int value = 0;
+    // 先读到临时对象里，全部成功后再替换当前状态，避免读档失败改坏当前进度。
     while (in >> key) {
         if (key == "stage") {
-            if (!(in >> version)) {
+            if (!(in >> value)) {
                 return false;
             }
-            loadedWorld.setStage(version);
+            loadedWorld.setStage(value);
             continue;
         }
         if (key == "turns") {
-            if (!(in >> version)) {
+            if (!(in >> value)) {
                 return false;
             }
-            loadedWorld.setTurnCount(version);
+            loadedWorld.setTurnCount(value);
             continue;
         }
         if (const auto resource = parseResourceKey(key)) {
-            if (!(in >> version)) {
+            if (!(in >> value)) {
                 return false;
             }
-            loadedWorld.setResource(*resource, version);
+            loadedWorld.setResource(*resource, value);
             continue;
         }
         if (key == "flag") {
@@ -227,16 +229,16 @@ bool SaveManager::loadGame(const string& path, GameContext& ctx) const {
         }
         // 兼容旧试玩存档：已移除的旧技能字段只读取、不恢复。
         if (key == "skill_gather") {
-            if (!(in >> version)) {
+            if (!(in >> value)) {
                 return false;
             }
             continue;
         }
         if (const auto skill = parseSkillKey(key)) {
-            if (!(in >> version)) {
+            if (!(in >> value)) {
                 return false;
             }
-            snapshot.skills[*skill] = version;
+            snapshot.skills[*skill] = value;
             continue;
         }
         if (key == "room") {

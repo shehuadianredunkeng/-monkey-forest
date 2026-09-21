@@ -16,6 +16,7 @@ using namespace std;
 namespace UI {
 namespace {
 
+constexpr size_t kMaxCommandGlyphs = 1024;
 
 Color messageColor(const wstring& text) {
     if (text.find(L"[触发条件：") != wstring::npos ||
@@ -44,8 +45,7 @@ Color messageColor(const wstring& text) {
         text.find(L"拾取") != wstring::npos ||
         text.find(L"获得") != wstring::npos)
         return Color::Item;
-    if (text.find(L"获得") != wstring::npos ||
-        text.find(L"成功") != wstring::npos ||
+    if (text.find(L"成功") != wstring::npos ||
         text.find(L"完成") != wstring::npos ||
         text.find(L"+1") != wstring::npos) return Color::Success;
     if (text.find(L"提示") != wstring::npos ||
@@ -200,6 +200,7 @@ bool InteractiveGameUI::render(const GameContext& ctx,
             if (fullRedraw || index >= lastMapTiles_.size() ||
                 tile.glyph != lastMapTiles_[index].glyph ||
                 tile.color != lastMapTiles_[index].color) {
+                // lastMapTiles_ 保存上一帧，只重画图案或颜色发生变化的格子。
                 // 地图每格固定占两列；补空格，免得一列宽的地板格只盖掉半个旧字形。
                 wstring glyph = renderer_.clip(tile.glyph, 2);
                 glyph += wstring(static_cast<size_t>(max(
@@ -391,7 +392,10 @@ optional<string> InteractiveGameUI::readTypedCommand(
             if (battleSaveShortcut && input.empty() &&
                 (event.text == L"p" || event.text == L"P"))
                 return "save";
-            const auto added = splitGlyphs(event.text);
+            auto added = splitGlyphs(event.text);
+            if (input.size() + added.size() > kMaxCommandGlyphs) {
+                added.resize(kMaxCommandGlyphs - input.size());
+            }
             input.insert(input.begin() + static_cast<ptrdiff_t>(caret),
                          added.begin(), added.end());
             caret += added.size();
@@ -422,6 +426,7 @@ void InteractiveGameUI::centered(SHORT y, const wstring& text,
 int InteractiveGameUI::menu(const wstring& title,
                             const vector<wstring>& options,
                             int initial) {
+    if (options.empty()) return -1;
     int selected = clamp(initial, 0, static_cast<int>(options.size()) - 1);
     while (true) {
         renderer_.beginFrame();

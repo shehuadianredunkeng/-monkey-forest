@@ -54,6 +54,7 @@ bool SaveSlots::load(int slot, GameContext& ctx,
 
 vector<string> SaveSlots::descriptions(
     const map<string, Room>& rooms) const {
+    // 菜单只需要阶段、位置和战斗血量，不需要把整份存档恢复出来。
     vector<string> result;
     for (int slot = 1; slot <= 3; ++slot) {
         ifstream in(path(slot));
@@ -74,6 +75,7 @@ vector<string> SaveSlots::descriptions(
             else if (key == "flag") {
                 string flag;
                 in >> quoted(flag);
+                // 战斗信息也存在 flag 里，这里只取出存档列表要显示的部分。
                 if (flag.rfind("flag_saved_battle_enemy_", 0) == 0)
                     inBattle = true;
                 const string prefix = "flag_saved_battle_health_";

@@ -24,10 +24,6 @@ const char* skillLabel(SkillType type) {
     return "未知";
 }
 
-int skillLevel(const GameContext& ctx, SkillType type) {
-    return ctx.player.getSkillLevel(type);
-}
-
 string roomLabel(const GameContext& ctx) {
     const string& roomId = ctx.player.getCurrentRoomId();
     const auto it = ctx.rooms.find(roomId);
@@ -83,6 +79,7 @@ const map<string, string>& flagLabels() {
 }
 
 bool shouldHideFlag(const string& flag) {
+    // flag 同时记录流程和内部状态，只有能翻译成玩家语言的才显示。
     return flag.rfind("flag_pending_", 0) == 0 ||
            flag.rfind("flag_wisdom_", 0) == 0 ||
            flag.rfind("flag_collection_", 0) == 0 ||
@@ -116,7 +113,7 @@ string buildStatusText(const GameContext& ctx) {
                                 SkillType::Leadership};
     out << "技能：";
     for (SkillType skill : skills) {
-        out << skillLabel(skill) << skillLevel(ctx, skill) << ' ';
+        out << skillLabel(skill) << player.getSkillLevel(skill) << ' ';
     }
     out << '\n';
 

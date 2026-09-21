@@ -3,6 +3,7 @@
 #include "InteractiveMap.h"
 #include "UI/ConsoleRenderer.h"
 
+#include <cstddef>
 #include <optional>
 #include <map>
 #include <string>

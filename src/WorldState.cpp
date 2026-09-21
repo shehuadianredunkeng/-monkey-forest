@@ -26,6 +26,7 @@ int WorldState::getStage() const {
 }
 
 void WorldState::setStage(int stage) {
+    // 游戏目前只有 1 到 6 阶段，读档时也不能超出这个范围。
     stage_ = clamp(stage, kFirstStage, kFinalStage);
 }
 
@@ -58,6 +59,8 @@ void WorldState::setResource(ResourceType type, int value) {
 }
 
 void WorldState::changeResource(ResourceType type, int delta) {
+    // 资源表不用提前填满，没出现过的资源按 0 处理；修改时仍统一走
+    // setResource，避免资源减少后变成负数。
     setResource(type, getResource(type) + delta);
 }
 

@@ -4,6 +4,8 @@
 #include "Player.h"
 #include "WorldState.h"
 
+#include <string>
+
 using namespace std;
 
 void setTestPlayerStamina(Player& player, int stamina);
