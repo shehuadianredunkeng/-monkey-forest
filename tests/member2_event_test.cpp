@@ -9,19 +9,19 @@
 #include "WorldState.h"
 
 #include <iostream>
-#include <map>
 #include <set>
 #include <stdexcept>
 #include <string>
 
 using namespace std;
 
+namespace {
+
 void resetWorld(WorldState& world) {
     world = WorldState{};
 }
 
-namespace {
-
+//检查战斗剧情返回给玩家的内容，不能出现敌人ID或程序接口名称。
 void expectPlayerFacingStory(const ActionResult& result,
                              const string& label) {
     expect(result.success, label + " battle bridge should succeed");
@@ -31,9 +31,7 @@ void expectPlayerFacingStory(const ActionResult& result,
            label + " story must not expose integration code");
 }
 
-}  // namespace
-
-namespace {
+//先检查事件配置、触发条件和玩家可见的中文提示。
 
 void testAllElevenEventsCanTrigger() {
     struct TriggerCase {
@@ -163,6 +161,7 @@ void testMainEventAndDuplicateProtection() {
     expect(!events.canTriggerEvent("event_tree_trial", ctx),
            "completed event must not repeat");
 }
+//检查剧情奖励和属性成长，保证不同选择不会让主线卡住。
 
 void testStoryPathGrantsRealChipItem() {
     Player player;
@@ -323,6 +322,8 @@ void testBaseLogCanProvideFinalWisdomPoint() {
            "base log research should supply the final hack wisdom point");
 }
 
+//随机事件可以完整结算，但不能代替主线或重复提供核心属性。
+
 void testAllRandomEventsCanBeCompleted() {
     Player player;
     WorldState world;
@@ -359,6 +360,8 @@ void testAllRandomEventsCanBeCompleted() {
                world.hasFlag("flag_event_drone_crash_done"),
            "each random event needs a persistent completion flag");
 }
+
+//检查事件与战斗系统的衔接：事件暂停、战斗胜利，再继续原剧情。
 
 void testRealCombatBridge() {
     Player player;
@@ -607,6 +610,8 @@ void testFiveEscapesOverrideNormalFinalRoutes() {
            "five escapes must override all three normal endings at final choice");
 }
 
+//模拟读取存档后的待处理事件，并检查阶段和结局文字不会暴露内部编号。
+
 void testPendingRecoveryAndStoryText() {
     Player player;
     WorldState world;
@@ -671,8 +676,8 @@ int main() {
         testWisdomRouteSurvivesMissingTreeReward();
         testRandomEventDoesNotGrantCoreAttributes();
         testEventClimbChecksAreReplacedByStrength();
-    testBaseLogCanProvideFinalWisdomPoint();
-    testAllRoutesAchievementHasAPlayablePath();
+        testBaseLogCanProvideFinalWisdomPoint();
+        testAllRoutesAchievementHasAPlayablePath();
         testAllRandomEventsCanBeCompleted();
         testRealCombatBridge();
         testAllBattlePromptsArePlayerFacing();
