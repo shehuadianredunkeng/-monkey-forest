@@ -2,7 +2,7 @@
 
 #include <utility>
 
-//集中创建所有剧情事件,事件系统通过事件编号查找并执行。
+//集中创建所有剧情事件，事件系统通过事件编号查找并执行。
 
 std::map<std::string, Event> createAllEvents() {
     std::map<std::string, Event> events;

@@ -643,7 +643,7 @@ ActionResult EventSystem::resolveChoice(const Event& event,
             "闪尾引开巡逻机，你成功取得完整日志。声望+8。",
             ctx);
     }
-    //最终路线选择,这里只记录玩家选择,结局判定和解锁状态由5号模块统一处理。
+    //最终路线选择，这里只记录玩家选择，结局判定和解锁状态由5号模块统一处理。
     if (event.eventId == "event_final_choice") {
         if (option == 1) {
             if (!world.hasFlag("flag_route_resist_ready") ||
