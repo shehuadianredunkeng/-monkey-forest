@@ -80,19 +80,6 @@ string describeExits(const GameContext& context, const Room& room) {
     bool first = true;
 
     for (const auto& [direction, roomId] : room.getExits()) {
-        // 果实森林到河谷的 up 是力量捷径。未达到条件时仍展示为锁定提示，
-        // 让玩家知道可以通过提升力量打开这条路线。
-        if (room.getId() == "room_forest" && direction == "up" &&
-            context.player.getStrength() < 2) {
-            if (!first) output << ", ";
-            const auto roomIt = context.rooms.find(roomId);
-            const string targetName = roomIt == context.rooms.end()
-                ? roomId : roomIt->second.getName();
-            output << "up -> " << targetName << "（树冠捷径，需要力量≥2）";
-            first = false;
-            continue;
-        }
-
         if (!first) {
             output << ", ";
         }
@@ -311,10 +298,8 @@ ActionResult movePlayer(GameContext& context, const string& direction) {
         return {false, "基地门禁尚未解锁，需要先完成前置主线。", false, false};
     }
 
-    const bool forestUp =
+    const bool forestShortcut =
         current->second.getId() == "room_forest" && direction == "up";
-
-    const bool forestShortcut = forestUp;
 
     if (forestShortcut && context.player.getStrength() < 2) {
         return {false, "树冠捷径需要力量至少2点。", false, false};

@@ -6,7 +6,9 @@
 #include "WorldState.h"
 
 #include <algorithm>
+#include <initializer_list>
 #include <sstream>
+#include <utility>
 
 using namespace std;
 
@@ -446,8 +448,12 @@ bool InteractiveMap::questIsHere(const GameContext& ctx) const {
 }
 
 MapMoveResult InteractiveMap::move(int dx, int dy, GameContext& ctx) {
-    constexpr int ROOM_TRANSITION_STAMINA_COST = 3;
     MapMoveResult outcome;
+    // 只接受水平或垂直的单格移动，防止跳格、斜向和原地输入。
+    if ((dx == 0 && dy == 0) || (dx != 0 && dy != 0) ||
+        dx < -1 || dx > 1 || dy < -1 || dy > 1)
+        return outcome;
+
     const Definition* map = current();
     if (map == nullptr) {
         outcome.action = {false, "当前地图不存在。", false, false};
@@ -460,23 +466,9 @@ MapMoveResult InteractiveMap::move(int dx, int dy, GameContext& ctx) {
 
     const auto door = map->doors.find(target);
     if (door != map->doors.end()) {
-        if (ctx.player.getStamina() < ROOM_TRANSITION_STAMINA_COST) {
-            outcome.action = {
-                false,
-                "体力不足：切换地图需要 3 点体力，请先休息或使用恢复物品。",
-                false,
-                false
-            };
-            return outcome;
-        }
-
-        const int staminaBeforeMove = ctx.player.getStamina();
+        // movePlayer 统一检查并扣除3点体力，这里不重复处理。
         outcome.action = movePlayer(ctx, door->second);
         if (outcome.action.success) {
-            // 房间接口扣的体力不固定，这里统一改成固定 3 点。
-            const int expectedStamina =
-                staminaBeforeMove - ROOM_TRANSITION_STAMINA_COST;
-            ctx.player.changeStamina(expectedStamina - ctx.player.getStamina());
             outcome.action.message = "切换地图成功，消耗 3 点体力。";
             roomId_ = ctx.player.getCurrentRoomId();
             const Definition* destination = current();

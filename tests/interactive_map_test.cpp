@@ -32,6 +32,19 @@ int main() {
         InteractiveMap map;
         map.resetForRoom(ctx);
 
+        // 移动接口只接受水平或垂直的单格输入，非法输入不得改变位置。
+        const int originalX = map.playerX();
+        const int originalY = map.playerY();
+        for (const auto& delta : {pair<int, int>{0, 0},
+                                  pair<int, int>{1, 1},
+                                  pair<int, int>{2, 0},
+                                  pair<int, int>{0, -2}}) {
+            const MapMoveResult rejected = map.move(delta.first, delta.second, ctx);
+            expect(!rejected.moved && !rejected.roomChanged &&
+                       map.playerX() == originalX && map.playerY() == originalY,
+                   "invalid movement must not move the player");
+        }
+
         const string roomIds[] = {
             "room_tree", "room_forest", "room_river", "room_cave", "room_base"};
         set<string> terrainLayouts;
