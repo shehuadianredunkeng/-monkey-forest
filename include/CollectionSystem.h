@@ -11,10 +11,9 @@ struct CollectionEntry {
     string id;
     string name;
     string description;
-    bool hidden = false;
+    bool hidden = false;//默认是影藏的
 };
-
-// 成就、结局统一收集入口。新内容先注册，再在达成处调用 unlock。
+// 成就结局统一收集入口。新内容先注册，再在达成处调用 unlock
 class CollectionSystem {
 public:
     CollectionSystem();
@@ -25,7 +24,7 @@ public:
     bool unlockEnding(const string& endingId, WorldState& world) const;
     bool unlockAchievement(const string& achievementId,
                            WorldState& world) const;
-    // 兼容旧存档：把现有旧旗标补录进新收集系统。
+    // 把现有旧旗标补录进新收集系统
     void syncLegacyFlags(WorldState& world) const;
 
     bool isEndingUnlocked(const string& endingId,
@@ -37,7 +36,7 @@ public:
     string getEndingCollectionText(const WorldState& world,
                                         bool showConditions = false) const;
     string getAchievementCollectionText(const WorldState& world,
-                                             bool showConditions = false) const;
+                                        bool showConditions = false) const;
 
     const vector<CollectionEntry>& endings() const;
     const vector<CollectionEntry>& achievements() const;

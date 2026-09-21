@@ -51,12 +51,7 @@ string flagSuffix(const WorldState& world, const string& prefix) {
 int flagNumber(const WorldState& world, const string& prefix,
                int fallback) {
     const string value = flagSuffix(world, prefix);
-    if (value.empty()) return fallback;
-    try {
-        return stoi(value);
-    } catch (...) {
-        return fallback;
-    }
+    return value.empty() ? fallback : stoi(value);
 }
 
 int combatVictoryCount(const WorldState& world) {
@@ -195,6 +190,8 @@ string randomScoutFollowUp() {
 }
 }
 
+CombatSystem::CombatSystem() { initializeEnemies(); }
+
 void CombatSystem::initializeEnemies() {
     enemies_.clear();
     enemies_.emplace("enemy_bees", Enemy{"enemy_bees", "野蜂群", 18, 6, 0, 5});
@@ -219,7 +216,6 @@ const Enemy* CombatSystem::currentEnemy() const {
 
 ActionResult CombatSystem::startBattle(const string& enemyId,
                                        GameContext& ctx) {
-    if (enemies_.empty()) initializeEnemies();
     if (battleState_.inBattle)
         return {false, "当前战斗尚未结束。", false, false};
     const string baseId = baseEnemyId(enemyId);
@@ -772,8 +768,7 @@ ActionResult CombatSystem::enemyCounterAttack(GameContext& ctx, bool guarded) {
 
 ActionResult CombatSystem::finishVictory(GameContext& ctx, const Enemy& enemy) {
     ctx.player.changeReputation(enemy.getReputationReward());
-    const string encounterId = battleState_.encounterId.empty()
-        ? enemy.getId() : battleState_.encounterId;
+    const string encounterId = battleState_.encounterId;
     const bool stoleThisBattle = battleState_.theftUsed;
     const string season = seasonalRelicId(enemy.getId());
     const string flag = defeatedFlag(encounterId);
@@ -828,21 +823,15 @@ void CombatSystem::saveBattleState(WorldState& world) const {
 }
 
 bool CombatSystem::restoreBattleState(GameContext& ctx) {
-    if (enemies_.empty()) initializeEnemies();
     const string enemyId = flagSuffix(
         ctx.world, string(SAVED_BATTLE_PREFIX) + "enemy_");
-    if (enemyId.empty()) return false;
     const auto enemy = enemies_.find(enemyId);
-    if (enemy == enemies_.end()) {
-        clearSavedBattleState(ctx.world);
-        return false;
-    }
+    if (enemy == enemies_.end()) return false;
     battleState_ = BattleState{};
     battleState_.inBattle = true;
     battleState_.enemyId = enemyId;
     battleState_.encounterId = flagSuffix(
         ctx.world, string(SAVED_BATTLE_PREFIX) + "encounter_");
-    if (battleState_.encounterId.empty()) battleState_.encounterId = enemyId;
     battleState_.enemyHealth = clamp(
         flagNumber(ctx.world, string(SAVED_BATTLE_PREFIX) + "health_",
                    enemy->second.getMaxHealth()),

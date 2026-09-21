@@ -24,6 +24,8 @@ struct BattleState {
 
 class CombatSystem {
 public:
+    CombatSystem();
+
     void initializeEnemies();
 
     ActionResult startBattle(const string& enemyId, GameContext& ctx);

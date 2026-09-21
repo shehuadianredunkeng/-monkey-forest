@@ -15,4 +15,4 @@ public:
 protected:
     string id_;
     string name_;
-};
+};//显示编号姓名
