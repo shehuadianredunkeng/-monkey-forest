@@ -36,18 +36,21 @@ public:
     void setCurrentRoomId(const string& roomId);
 
 private:
+    // 生命、体力和成长属性都由 change 函数统一修改，避免超过游戏范围。
     int health = 100;
     int stamina = 60;
     int strength = 1;
     int wisdom = 1;
     int reputation = 0;
 
+    // 三种技能初始都是1级，战斗技能的上限会高一些。
     map<SkillType, int> skills = {
         {SkillType::Climb, 1},
         {SkillType::Combat, 1},
         {SkillType::Leadership, 1},
     };
 
+    // 玩家自己保存背包和当前所在房间。
     Inventory inventory;
     string currentRoomId = "room_tree";
 };

@@ -37,6 +37,7 @@ namespace {
 
 void configureApplication() {
 #ifdef _WIN32
+    // 统一使用UTF-8，并把存档放到程序所在目录。
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
     wchar_t executable[MAX_PATH]{};
@@ -50,6 +51,7 @@ void configureApplication() {
 }
 
 void initializeNewWorld(WorldState& world) {
+    // 新游戏从第一阶段和默认资源开始。
     world.setStage(1);
     world.setTurnCount(0);
     world.setResource(ResourceType::Food, 0);
@@ -73,6 +75,7 @@ bool consumesMapInteractionStamina(InteractionKind kind) {
 ActionResult chargeMapInteractionStamina(InteractionKind kind,
                                          ActionResult action,
                                          GameContext& ctx) {
+    // 只有互动成功后才扣体力，和NPC说话不消耗体力。
     if (!action.success || !consumesMapInteractionStamina(kind)) return action;
     ctx.player.changeStamina(-1);
     if (!action.message.empty()) action.message += "\n";
@@ -105,6 +108,7 @@ string lowerAscii(string text) {
 }
 
 string pendingEnemyId(const WorldState& world) {
+    // 剧情先设置待战标记，回到主循环后再真正进入战斗。
     if (world.hasFlag("flag_pending_battle_bees") &&
         !world.hasFlag("flag_bees_defeated")) return "enemy_bees";
     if (world.hasFlag("flag_pending_battle_robot") &&
@@ -133,6 +137,7 @@ string seasonName(int turn) {
 }
 
 bool hasAnyFinalRoute(const GameContext& ctx) {
+    // 第六阶段至少满足一条路线，才会进入对应的正常结局选择。
     const bool resist = ctx.world.hasFlag("flag_route_resist_ready") &&
         ctx.player.getReputation() >= 60 &&
         ctx.player.getSkillLevel(SkillType::Combat) >= 2;
@@ -180,6 +185,7 @@ string roomArrival(const GameContext& ctx) {
 }
 
 ActionResult takeMapItem(const string& itemId, GameContext& ctx) {
+    // 拾取标记写进世界状态，读档后物品不会重新出现。
     const string flag = "flag_taken_" + ctx.player.getCurrentRoomId() +
                              "_" + itemId;
     if (ctx.world.hasFlag(flag)) return result(false, "这里已经空了。");
@@ -189,6 +195,7 @@ ActionResult takeMapItem(const string& itemId, GameContext& ctx) {
 }
 
 ActionResult openChest(const string& chestId, GameContext& ctx) {
+    // 每个宝箱只结算一次，背包满时先不写打开标记。
     const string flag = "flag_opened_" + chestId;
     if (ctx.world.hasFlag(flag)) return result(false, "宝箱已经打开过了。");
 
@@ -214,6 +221,7 @@ ActionResult findEasterEgg(const string& eggId, GameContext& ctx) {
     const string flag = "flag_found_" + eggId;
     if (ctx.world.hasFlag(flag)) return result(false, "这里的秘密已经被发现了。");
     ctx.world.setFlag(flag);
+    // 四季信物既放进背包，也用世界标记参与隐藏结局判断。
     if (eggId.rfind("season_relic_", 0) == 0) {
         const string season = eggId.substr(string("season_relic_").size());
         string name = season == "spring" ? "春花" :
@@ -329,6 +337,7 @@ string specialEndingId(const GameContext& ctx,
 void applyResult(const ActionResult& action, GameContext& ctx,
                  ProgressSystem& progress, EventSystem& events,
                  UI::InteractiveGameUI& ui) {
+    // 先结算回合和阶段，再把结果显示到日志中。
     const int oldStage = ctx.world.getStage();
     progress.applyActionResult(action, ctx.world);
     if (!action.message.empty()) ui.appendLog(action.message);
@@ -366,6 +375,7 @@ vector<wstring> slotDescriptions(const SaveSlots& slots,
 
 void updateProfile(GameContext& ctx, WorldState& profile,
                    CollectionSystem& collections) {
+    // 结局和成就属于全局收藏，不跟某一个存档位绑定。
     collections.syncLegacyFlags(ctx.world);
     mergeCollectionFlags(ctx.world, profile);
     saveCollectionProfile("collection_profile.txt", profile);
@@ -393,6 +403,7 @@ void handleBattleCommand(const string& line, GameContext& ctx,
         const int slot = ui.showSlotMenu(L"战 斗 中 存 档",
                                           slotDescriptions(slots, ctx), true);
         if (slot > 0) {
+            // 战斗存档还要额外记录敌人和双方当前生命。
             map.storePosition(ctx);
             combat.saveBattleState(ctx.world);
             ui.appendLog(slots.save(slot, ctx, saveManager)
@@ -441,6 +452,7 @@ GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
         ui.appendLog("【战斗读档成功】已恢复你和敌人存档时的生命与战斗进度。");
     int announcedSeason = -1;
 
+    // 探索、剧情和战斗都在这个主循环里切换。
     while (true) {
         map.ensureCurrentRoom(ctx);
         updateProfile(ctx, profile, collections);
@@ -454,6 +466,7 @@ GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
             ctx.world.hasFlag("flag_hidden_ending_earth_gift") ||
             ctx.world.hasFlag("flag_hidden_ending_spark") ||
             ctx.world.hasFlag("flag_normal_ending_not_hero");
+        // 任意结局标记出现后，结束本轮并更新收藏。
         if (ended) {
             const string id = specialEndingId(ctx, endings);
             collections.unlockEnding(id, ctx.world);
@@ -472,6 +485,7 @@ GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
         if (!ui.render(ctx, map, combat, objective(ctx)))
             return GameExit::Closed;
 
+        // 战斗状态下只读取战斗指令，不再处理地图按键。
         if (combat.isInBattle()) {
             const optional<string> command =
                 ui.readTypedCommand(L"战斗指令（P 存档） > ", true);
@@ -514,6 +528,7 @@ GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
                 applyResult(outcome, ctx, progress, events, ui);
                 continue;
             }
+            // 地图只负责告诉主循环碰到了什么，具体效果交给各模块处理。
             switch (interaction.kind) {
             case InteractionKind::Npc:
                 outcome = npcs.talkToNPC(interaction.id, ctx);
@@ -598,6 +613,7 @@ GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
                                action == UI::ExploreAction::Choice2 ? 2 :
                                action == UI::ExploreAction::Choice3 ? 3 : 4;
             ActionResult choice;
+            // 选项优先交给正在等待的战斗/NPC，最后才交给主线事件。
             if (ctx.world.hasFlag("flag_pending_scout_wander_choice"))
                 choice = combat.chooseEscapeEndingOption(option, ctx);
             else {
@@ -630,6 +646,7 @@ GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
             const int slot = ui.showSlotMenu(L"选 择 存 档 位",
                                               slotDescriptions(slots, ctx), true);
             if (slot > 0) {
+                // 探索存档记录地图位置，并清掉可能残留的战斗状态。
                 map.storePosition(ctx);
                 combat.clearSavedBattleState(ctx.world);
                 ui.appendLog(slots.save(slot, ctx, saveManager)
@@ -673,6 +690,7 @@ int main() {
     loadCollectionProfile("collection_profile.txt", profile);
 
     bool preferContinue = false;
+    // 每次从一轮游戏返回后都会重新显示主菜单。
     while (true) {
         const int selected = ui.showMainMenu(slots.any(), preferContinue);
         preferContinue = false;
@@ -698,6 +716,7 @@ int main() {
         map<string, Room> rooms = createAllRooms();
         GameContext ctx{player, world, rooms};
 
+        // 继续游戏时，先建立默认对象，再让存档数据覆盖进去。
         if (selected == 1) {
             if (!slots.any()) {
                 ui.showTextPage(L"继 续 游 戏", L"目前还没有存档。请先选择“新的开始”。");

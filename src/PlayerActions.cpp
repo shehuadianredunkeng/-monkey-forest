@@ -66,12 +66,14 @@ const ItemInfo* findItemInfo(const string& target)
 
 ActionResult takeItem(const string& itemId, GameContext& ctx)
 {
+    // 先确认玩家所在房间有效，再检查房间里有没有目标物品。
     const auto room = ctx.rooms.find(ctx.player.getCurrentRoomId());
     if (room == ctx.rooms.end())
     {
         return makeResult(false, "当前位置不存在，无法拾取物品。", false);
     }
 
+    // 输入可以是内部ID、英文简称或中文名称。
     const ItemInfo* item = findItemInfo(itemId);
     if (item == nullptr)
     {
@@ -84,6 +86,7 @@ ActionResult takeItem(const string& itemId, GameContext& ctx)
         return makeResult(false, "当前房间没有该物品。", false);
     }
 
+    // 背包负责处理同类叠加和槽位是否已满。
     if (!ctx.player.addItem(Item(item->id, item->name, item->important, 1)))
     {
         return makeResult(false, "背包已满，无法拾取该物品。", false);
@@ -93,6 +96,7 @@ ActionResult takeItem(const string& itemId, GameContext& ctx)
 
 ActionResult useItem(const string& itemId, GameContext& ctx)
 {
+    // 后面的判断都使用统一ID，中文名和英文简称只在这里转换一次。
     const auto* info = findItemInfo(itemId);
     const string canonicalId = info == nullptr ? itemId : info->id;
     if (!ctx.player.hasItem(canonicalId))
@@ -100,6 +104,7 @@ ActionResult useItem(const string& itemId, GameContext& ctx)
         return makeResult(false, "背包中没有该物品。", false);
     }
 
+    // 普通补给品使用后从背包减去一件。
     if (canonicalId == "item_herb")
     {
         if (ctx.player.getHealth() >= 100)
@@ -150,6 +155,7 @@ ActionResult useItem(const string& itemId, GameContext& ctx)
         return makeResult(true, "你拆开野外补给，生命+10，体力+20。", true);
     }
 
+    // 四季信物留到最终阶段统一判定，不能提前消耗。
     if (canonicalId == "item_spring_token" ||
         canonicalId == "item_summer_token" ||
         canonicalId == "item_autumn_token" ||
@@ -160,6 +166,7 @@ ActionResult useItem(const string& itemId, GameContext& ctx)
                           false);
     }
 
+    // 藤索、燧石和晶片由对应剧情事件读取。
     if (canonicalId == "item_rope" || canonicalId == "item_flint" ||
         canonicalId == "item_chip")
     {
@@ -184,6 +191,7 @@ string showInventory(const Player& player)
         return "背包 0/" + to_string(Inventory::MAX_SLOTS) + "\n背包为空。";
     }
 
+    // 显示名称来自上面的物品表，不把item_fruit这类内部ID给玩家看。
     ostringstream output;
     output << "背包 " << items.size() << "/" << Inventory::MAX_SLOTS;
     for (const Item& item : items)

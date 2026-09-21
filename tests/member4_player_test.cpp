@@ -19,6 +19,7 @@ namespace
 {
 void testItemAndInventory()
 {
+    // 先检查物品本身，再检查叠加、关键物品和容量限制。
     Item fruit("item_fruit", "果实", false, 2);
     expect(fruit.getId() == "item_fruit", "Item ID mismatch");
     expect(fruit.getName() == "果实", "Item name mismatch");
@@ -67,6 +68,7 @@ void testPlayerState()
     expect(player.getReputation() == 0, "Initial reputation mismatch");
     expect(player.getCurrentRoomId() == "room_tree", "Initial room mismatch");
 
+    // 使用较大的改变量，确认各项属性不会越过上下限。
     player.changeHealth(-500);
     player.changeStamina(500);
     player.changeStrength(500);
@@ -145,6 +147,7 @@ void testPlayerActions()
 }
 struct PickupFixture
 {
+    // 给拾取相关测试准备一个只包含指定物品的房间。
     Player player;
     WorldState world;
     map<string, Room> rooms;

@@ -21,6 +21,7 @@ public:
 private:
     string id;
     string name;
+    // 剧情物品不能像普通消耗品一样从背包删除。
     bool important;
     int count;
 };

@@ -45,5 +45,6 @@ void Item::addCount(int delta)
 
 void Item::reduceCount(int delta)
 {
+    // 数量减到0即可，不能出现负数物品。
     count = max(0, count - delta);
 }

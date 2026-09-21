@@ -6,6 +6,7 @@ using namespace std;
 
 namespace
 {
+// 玩家数值统一在这里限制上下界。
 int changeValue(int value, int delta, int minimum, int maximum)
 {
     return clamp(value + delta, minimum, maximum);
@@ -69,6 +70,7 @@ int Player::getSkillLevel(SkillType type) const
 
 void Player::changeSkillLevel(SkillType type, int delta)
 {
+    // 战斗内容较多，战斗技能最高5级，另外两种最高3级。
     const int maximum = type == SkillType::Combat ? 5 : 3;
     skills[type] = changeValue(getSkillLevel(type), delta, 1, maximum);
 }
