@@ -402,9 +402,8 @@ void handleBattleCommand(const string& line, GameContext& ctx,
         }
         return;
     }
-    const bool wasInBattle = combat.isInBattle();
     ActionResult battle = combat.performBattleAction(action, target, ctx);
-    const bool endedBattle = wasInBattle && !combat.isInBattle();
+    const bool endedBattle = !combat.isInBattle();
     if (!endedBattle) battle.turnConsumed = false;
     else if (battle.success && !battle.stageCompleted && ctx.player.getHealth() > 0)
         battle.turnConsumed = true;
@@ -431,6 +430,7 @@ GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
     EndingSystem endings;
     InteractiveMap map;
     map.resetForRoom(ctx);
+    // 读档时可能停在一场尚未结束的战斗里。
     const bool resumedBattle = combat.restoreBattleState(ctx);
 
     ui.clearLog();
@@ -487,6 +487,7 @@ GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
 
         int dx = 0;
         int dy = 0;
+        // 方向键先换算成地图位移，其他按键在后面分别处理。
         if (action == UI::ExploreAction::MoveUp) dy = -1;
         if (action == UI::ExploreAction::MoveDown) dy = 1;
         if (action == UI::ExploreAction::MoveLeft) dx = -1;

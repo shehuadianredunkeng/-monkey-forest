@@ -2,20 +2,16 @@
 
 #include "Item.h"
 #include "Room.h"
-#include "WorldState.h"
 
 #include <algorithm>
 #include <sstream>
 #include <string>
 #include <utility>
-#include <vector>
 
 using namespace std;
 
 namespace
 {
-constexpr int TRAIN_STAMINA_COST = 20;
-constexpr int REST_STAMINA_RECOVERY = 30;
 constexpr int HERB_HEALTH_RECOVERY = 25;
 constexpr int FRUIT_STAMINA_RECOVERY = 15;
 constexpr int HONEY_HEALTH_RECOVERY = 15;
@@ -37,6 +33,7 @@ struct ItemInfo
     bool important;
 };
 
+// 玩家可以输入物品名，也可以输入界面上显示的英文简称。
 const ItemInfo* findItemInfo(const string& target)
 {
     static constexpr ItemInfo items[] = {
@@ -65,33 +62,6 @@ const ItemInfo* findItemInfo(const string& target)
     return nullptr;
 }
 
-string joinNames(const vector<string>& names)
-{
-    string text;
-    for (const auto& name : names)
-    {
-        if (!text.empty())
-        {
-            text += "、";
-        }
-        text += name;
-    }
-    return text;
-}
-
-string skillName(SkillType type)
-{
-    switch (type)
-    {
-    case SkillType::Climb:
-        return "攀爬";
-    case SkillType::Combat:
-        return "战斗";
-    case SkillType::Leadership:
-        return "领导";
-    }
-    return "未知";
-}
 } // namespace
 
 ActionResult takeItem(const string& itemId, GameContext& ctx)
@@ -102,79 +72,23 @@ ActionResult takeItem(const string& itemId, GameContext& ctx)
         return makeResult(false, "当前位置不存在，无法拾取物品。", false);
     }
 
-    const auto& roomItemIds = room->second.getItemIds();
-    const ItemInfo* target = itemId.empty() ? nullptr : findItemInfo(itemId);
-    if (!itemId.empty() && target == nullptr)
+    const ItemInfo* item = findItemInfo(itemId);
+    if (item == nullptr)
     {
         return makeResult(false, "无法识别该物品。", false);
     }
-    if (target != nullptr &&
-        find(roomItemIds.cbegin(), roomItemIds.cend(), target->id) == roomItemIds.cend())
+
+    const auto& roomItems = room->second.getItemIds();
+    if (find(roomItems.begin(), roomItems.end(), item->id) == roomItems.end())
     {
         return makeResult(false, "当前房间没有该物品。", false);
     }
 
-    vector<string> obtained;
-    vector<string> blocked;
-    bool unknownItem = false;
-    for (const auto& roomItemId : roomItemIds)
+    if (!ctx.player.addItem(Item(item->id, item->name, item->important, 1)))
     {
-        if (target != nullptr && roomItemId != target->id)
-        {
-            continue;
-        }
-        // 拾取旗标沿用主循环的约定，这里只读。
-        if (ctx.world.hasFlag("flag_taken_" + ctx.player.getCurrentRoomId() + "_" + roomItemId))
-        {
-            if (target != nullptr)
-            {
-                return makeResult(false, "这个位置的该物品已经被拿走。", false);
-            }
-            continue;
-        }
-        const auto* info = findItemInfo(roomItemId);
-        if (info == nullptr)
-        {
-            unknownItem = true;
-            continue;
-        }
-        if (ctx.player.addItem(Item(info->id, info->name, info->important, 1)))
-        {
-            obtained.emplace_back(info->name);
-        }
-        else
-        {
-            blocked.emplace_back(info->name);
-        }
+        return makeResult(false, "背包已满，无法拾取该物品。", false);
     }
-
-    string message;
-    if (!obtained.empty())
-    {
-        message = "你拾取了：" + joinNames(obtained) + "。";
-    }
-    else if (!blocked.empty())
-    {
-        message = "背包已满，无法拾取这里的物品。";
-    }
-    else if (!unknownItem)
-    {
-        message = "这里没有可以拾取的物品。";
-    }
-    if (!obtained.empty() && !blocked.empty())
-    {
-        message += "\n背包空间不足，未能拾取：" + joinNames(blocked) + "。";
-    }
-    if (unknownItem)
-    {
-        if (!message.empty())
-        {
-            message += '\n';
-        }
-        message += "部分物品无法识别，未能拾取。";
-    }
-    const bool success = !obtained.empty();
-    return makeResult(success, move(message), success);
+    return makeResult(true, "你拾取了：" + string(item->name) + "。", true);
 }
 
 ActionResult useItem(const string& itemId, GameContext& ctx)
@@ -192,10 +106,7 @@ ActionResult useItem(const string& itemId, GameContext& ctx)
         {
             return makeResult(false, "生命值已满，不需要使用草药。", false);
         }
-        if (!ctx.player.removeItem(canonicalId))
-        {
-            return makeResult(false, "该物品受到保护，无法消耗。", false);
-        }
+        ctx.player.removeItem(canonicalId);
         ctx.player.changeHealth(HERB_HEALTH_RECOVERY);
         return makeResult(true, "你使用草药恢复了生命。", true);
     }
@@ -206,10 +117,7 @@ ActionResult useItem(const string& itemId, GameContext& ctx)
         {
             return makeResult(false, "体力已满，不需要食用果实。", false);
         }
-        if (!ctx.player.removeItem(canonicalId))
-        {
-            return makeResult(false, "该物品受到保护，无法消耗。", false);
-        }
+        ctx.player.removeItem(canonicalId);
         ctx.player.changeStamina(FRUIT_STAMINA_RECOVERY);
         return makeResult(true, "你食用果实恢复了体力。", true);
     }
@@ -222,10 +130,7 @@ ActionResult useItem(const string& itemId, GameContext& ctx)
                               "你尝了尝蜂蜜，现在生命和体力都很充足，该物品暂时无效。",
                               false);
         }
-        if (!ctx.player.removeItem(canonicalId))
-        {
-            return makeResult(false, "蜂蜜无法消耗。", false);
-        }
+        ctx.player.removeItem(canonicalId);
         ctx.player.changeHealth(HONEY_HEALTH_RECOVERY);
         ctx.player.changeStamina(HONEY_STAMINA_RECOVERY);
         return makeResult(true, "你吃下蜂蜜，生命+15，体力+10。", true);
@@ -239,10 +144,7 @@ ActionResult useItem(const string& itemId, GameContext& ctx)
                               "生命和体力都已充足，野外补给现在没有效果。",
                               false);
         }
-        if (!ctx.player.removeItem(canonicalId))
-        {
-            return makeResult(false, "野外补给无法消耗。", false);
-        }
+        ctx.player.removeItem(canonicalId);
         ctx.player.changeHealth(WILD_SUPPLY_HEALTH_RECOVERY);
         ctx.player.changeStamina(WILD_SUPPLY_STAMINA_RECOVERY);
         return makeResult(true, "你拆开野外补给，生命+10，体力+20。", true);
@@ -272,35 +174,6 @@ ActionResult useItem(const string& itemId, GameContext& ctx)
     }
 
     return makeResult(false, "该物品当前无法使用。", false);
-}
-
-ActionResult trainSkill(SkillType type, GameContext& ctx)
-{
-    const int maximum = type == SkillType::Combat ? 5 : 3;
-    if (ctx.player.getSkillLevel(type) >= maximum)
-    {
-        return makeResult(false, skillName(type) + "技能已经达到最高等级。", false);
-    }
-
-    if (ctx.player.getStamina() < TRAIN_STAMINA_COST)
-    {
-        return makeResult(false, "体力不足，无法训练技能。", false);
-    }
-
-    ctx.player.changeStamina(-TRAIN_STAMINA_COST);
-    ctx.player.changeSkillLevel(type, 1);
-    return makeResult(true, skillName(type) + "技能提升了一级。", true);
-}
-
-ActionResult rest(GameContext& ctx)
-{
-    if (ctx.player.getStamina() >= 100)
-    {
-        return makeResult(false, "体力已满，不需要休息。", false);
-    }
-
-    ctx.player.changeStamina(REST_STAMINA_RECOVERY);
-    return makeResult(true, "你休息了一会儿，恢复了体力。", true);
 }
 
 string showInventory(const Player& player)

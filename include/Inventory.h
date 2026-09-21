@@ -21,8 +21,6 @@ public:
 
     const vector<Item>& getItems() const;
 
-    bool isFull() const;
-
 private:
     vector<Item> items;
 };

@@ -22,7 +22,7 @@ bool Inventory::addItem(const Item& item)
         return true;
     }
 
-    if (isFull())
+    if (items.size() >= MAX_SLOTS)
     {
         return false;
     }
@@ -64,7 +64,3 @@ const vector<Item>& Inventory::getItems() const
     return items;
 }
 
-bool Inventory::isFull() const
-{
-    return items.size() >= MAX_SLOTS;
-}

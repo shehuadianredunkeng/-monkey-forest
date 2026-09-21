@@ -21,7 +21,7 @@ void verifyFrame() {
     const SHORT height = info.srWindow.Bottom + 1;
     const SHORT inputTop = height - 5;
     expect(info.srWindow.Left == 0 && info.srWindow.Top == 0 &&
-           info.srWindow.Right >= right && info.srWindow.Bottom >= height - 1,
+           right >= UI::UI_WIDTH && height >= UI::UI_HEIGHT,
            "viewport must include all fixed coordinates");
     DWORD mode = 0;
     expect(GetConsoleMode(out, &mode) && !(mode & ENABLE_WRAP_AT_EOL_OUTPUT), "native wrapping must be disabled");

@@ -11,8 +11,4 @@ ActionResult takeItem(const string& itemId, GameContext& ctx);
 
 ActionResult useItem(const string& itemId, GameContext& ctx);
 
-ActionResult trainSkill(SkillType type, GameContext& ctx);
-
-ActionResult rest(GameContext& ctx);
-
 string showInventory(const Player& player);

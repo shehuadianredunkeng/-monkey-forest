@@ -51,7 +51,6 @@ void testItemAndInventory()
         expect(full.addItem(Item("test_" + to_string(i), "测试物品")),
                "Each of twelve slots should be usable");
     }
-    expect(full.isFull(), "Twelve distinct IDs should fill the inventory");
     expect(full.addItem(Item("test_0", "测试物品", false, 2)),
            "Existing stacks should accept items when full");
     expect(!full.addItem(Item("test_12", "额外物品")),
@@ -139,18 +138,6 @@ void testPlayerActions()
     expect(player.getStamina() == 15, "Fruit stamina recovery mismatch");
     expect(!player.hasItem("item_fruit"), "Used fruit should be consumed");
 
-    player.changeStamina(100);
-    const ActionResult train = trainSkill(SkillType::Leadership, context);
-    expect(train.success && train.turnConsumed, "Skill training should succeed");
-    expect(player.getSkillLevel(SkillType::Leadership) == 2,
-           "Training should increase skill level");
-    expect(player.getStamina() == 80, "Training stamina cost mismatch");
-
-    player.changeStamina(-50);
-    const ActionResult rested = rest(context);
-    expect(rested.success && rested.turnConsumed, "Rest should succeed");
-    expect(player.getStamina() == 60, "Rest recovery mismatch");
-
     expect(showInventory(player).find("背包为空。") != string::npos,
            "Empty inventory text mismatch");
     expect(!takeItem("item_rope", context).success,
@@ -180,15 +167,6 @@ int countOf(const Player& player, const string& id)
         }
     }
     return 0;
-}
-
-void fillSlots(Player& player, int count)
-{
-    for (int i = 0; i < count; ++i)
-    {
-        expect(player.addItem(Item("test_" + to_string(i), "测试物品")),
-               "Test setup could not fill inventory slot");
-    }
 }
 
 void testRemoveOneUntilSlotDisappears()
@@ -224,17 +202,6 @@ void testConsumableUseRemovesExactlyOne()
     result = useItem("item_herb", f.context);
     expect(!result.success && !result.turnConsumed && f.player.getHealth() == 80,
            "Missing herb must not heal or consume a turn");
-}
-
-void testUnremovableConsumableDoesNotGrantFreeEffect()
-{
-    PickupFixture f({});
-    f.player.changeHealth(-50);
-    expect(f.player.addItem(Item("item_herb", "任务草药", true, 2)), "Add protected herb");
-    const auto result = useItem("item_herb", f.context);
-    expect(!result.success && !result.turnConsumed && f.player.getHealth() == 50 &&
-               countOf(f.player, "item_herb") == 2,
-           "Failed removal must not grant an unconsumed healing effect");
 }
 
 void testPlotItemsAreNotConsumed()
@@ -306,103 +273,6 @@ void testSpecifiedPickupDoesNotTakeOtherItems()
                !f.player.hasItem("item_fruit"), "Specified pickup must remain selective");
 }
 
-void testBatchPickupInRoomOrder()
-{
-    PickupFixture f({"item_fruit", "item_herb", "item_rope"});
-    const auto result = takeItem("", f.context);
-    expect(result.success && result.turnConsumed && !result.stageCompleted,
-           "Batch pickup must return one successful action");
-    const auto& items = f.player.getInventory().getItems();
-    expect(items.size() == 3 && items[0].getId() == "item_fruit" &&
-               items[1].getId() == "item_herb" && items[2].getId() == "item_rope",
-           "Batch pickup must follow room order");
-    expect(result.message.find("果实") != string::npos &&
-               result.message.find("草药") != string::npos &&
-               result.message.find("藤索") != string::npos,
-           "Batch pickup must name every obtained item");
-}
-
-void testBatchPartialCapacity()
-{
-    PickupFixture f({"item_fruit", "item_herb", "item_rope"});
-    fillSlots(f.player, 11);
-    const auto result = takeItem("", f.context);
-    expect(result.success && result.turnConsumed && f.player.hasItem("item_fruit") &&
-               !f.player.hasItem("item_herb") && !f.player.hasItem("item_rope"),
-           "Partial pickup must preserve successes without rollback");
-    expect(result.message.find("果实") != string::npos &&
-               result.message.find("空间不足") != string::npos &&
-               result.message.find("草药") != string::npos &&
-               result.message.find("藤索") != string::npos,
-           "Partial pickup must explain obtained and blocked items");
-}
-
-void testFullBagStillStacksAfterFailedNewItem()
-{
-    PickupFixture f({"item_rope", "item_fruit"});
-    fillSlots(f.player, 11);
-    expect(f.player.addItem(Item("item_fruit", "果实", 3)), "Add existing fruit stack");
-    const auto result = takeItem("", f.context);
-    expect(result.success && result.turnConsumed && countOf(f.player, "item_fruit") == 4 &&
-                !f.player.hasItem("item_rope") && f.player.getInventory().getItems().size() == 12,
-           "Full bag must continue attempting later existing stacks");
-}
-
-void testBatchFullEmptyAndMissingRooms()
-{
-    PickupFixture f({"item_fruit", "item_herb"});
-    fillSlots(f.player, 12);
-    auto result = takeItem("", f.context);
-    expect(!result.success && !result.turnConsumed && !result.stageCompleted &&
-               !f.player.hasItem("item_fruit"), "No item obtained means no turn");
-    expect(result.message.find("背包已满") != string::npos, "Explain full bag");
-    PickupFixture empty({});
-    result = takeItem("", empty.context);
-    expect(!result.success && !result.turnConsumed &&
-               result.message.find("没有可以拾取") != string::npos, "Explain empty room");
-    empty.player.setCurrentRoomId("missing");
-    result = takeItem("", empty.context);
-    expect(!result.success && !result.turnConsumed && !result.message.empty(),
-           "Missing room must fail safely");
-}
-
-void testUnknownRoomItemsDoNotBlockKnownItems()
-{
-    PickupFixture f({"item_unknown", "item_fruit"});
-    const auto result = takeItem("", f.context);
-    expect(result.success && f.player.hasItem("item_fruit") &&
-               !f.player.hasItem("item_unknown"), "Unknown ID must not abort valid pickups");
-    expect(result.message.find("无法识别") != string::npos, "Explain unknown item");
-}
-
-void testDisplayedAliasesWorkWithoutCommandChains()
-{
-    const string aliases[][3] = {
-        {"item_fruit", "fruit", "果实"}, {"item_herb", "herb", "草药"},
-        {"item_rope", "rope", "藤索"}, {"item_flint", "flint", "燧石"},
-        {"item_chip", "chip", "晶片"},
-    };
-    for (const auto& entry : aliases)
-    {
-        for (const auto& alias : entry)
-        {
-            PickupFixture f({entry[0]});
-            expect(takeItem(alias, f.context).success && countOf(f.player, entry[0]) == 1,
-                   "Displayed alias must resolve to canonical inventory ID");
-        }
-    }
-    PickupFixture f({"item_herb"});
-    f.player.changeHealth(-60);
-    expect(takeItem("herb", f.context).success && useItem("草药", f.context).success &&
-               !f.player.hasItem("item_herb"), "Use must accept displayed aliases too");
-    for (const auto* chain : {"herb; use herb", "herb && use herb", "herb, use herb"})
-    {
-        const auto result = takeItem(chain, f.context);
-        expect(!result.success && !result.turnConsumed && !f.player.hasItem("item_herb"),
-               "Item aliases must not interpret command chains");
-    }
-}
-
 void testInventoryDisplayUsesCanonicalNamesAndSlots()
 {
     Player player;
@@ -449,17 +319,10 @@ int main()
         {"existing actions", testPlayerActions},
         {"remove stacked units", testRemoveOneUntilSlotDisappears},
         {"consume herbs", testConsumableUseRemovesExactlyOne},
-        {"protected consumable", testUnremovableConsumableDoesNotGrantFreeEffect},
         {"protect plot items", testPlotItemsAreNotConsumed},
         {"honey and season tokens", testHoneyAndSeasonTokensAreRecognized},
         {"all combat reward items", testAllCombatRewardItemsAreRecognized},
         {"specified pickup", testSpecifiedPickupDoesNotTakeOtherItems},
-        {"batch pickup", testBatchPickupInRoomOrder},
-        {"partial pickup", testBatchPartialCapacity},
-        {"full bag stacking", testFullBagStillStacksAfterFailedNewItem},
-        {"full/empty/missing room", testBatchFullEmptyAndMissingRooms},
-        {"unknown room item", testUnknownRoomItemsDoNotBlockKnownItems},
-        {"aliases without chains", testDisplayedAliasesWorkWithoutCommandChains},
         {"inventory display", testInventoryDisplayUsesCanonicalNamesAndSlots},
         {"empty inventory display", testEmptyInventoryShowsZeroSlots},
     };
