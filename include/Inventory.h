@@ -6,20 +6,23 @@
 #include <string>
 #include <vector>
 
+using namespace std;
+
 class Inventory
 {
 public:
+    static constexpr size_t MAX_SLOTS = 12;
+
     bool addItem(const Item& item);
 
-    bool removeItem(const std::string& itemId);
+    bool removeItem(const string& itemId);
 
-    bool hasItem(const std::string& itemId) const;
+    bool hasItem(const string& itemId) const;
 
-    const std::vector<Item>& getItems() const;
+    const vector<Item>& getItems() const;
 
     bool isFull() const;
 
 private:
-    static constexpr std::size_t MAX_SLOTS = 8;
-    std::vector<Item> items;
+    vector<Item> items;
 };

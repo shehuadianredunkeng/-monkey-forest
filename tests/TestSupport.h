@@ -4,6 +4,9 @@
 #include "Player.h"
 #include "WorldState.h"
 
+using namespace std;
+
 void setTestPlayerStamina(Player& player, int stamina);
+void setTestPlayerStrength(Player& player, int strength);
 void setTestPlayerSkill(Player& player, SkillType skill, int level);
-void setTestWorldFlag(WorldState& world, const std::string& flag, bool enabled);
+void setTestWorldFlag(WorldState& world, const string& flag, bool enabled);

@@ -4,9 +4,11 @@
 
 #include "Character.h"
 
+using namespace std;
+
 class NPC : public Character {
 public:
-    NPC() : Character("", "", "") {}
-    NPC(std::string id, std::string name, std::string description)
-        : Character(std::move(id), std::move(name), std::move(description)) {}
+    NPC() : Character("", "") {}
+    NPC(string id, string name)
+        : Character(move(id), move(name)) {}
 };

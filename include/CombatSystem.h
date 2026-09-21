@@ -4,11 +4,14 @@
 #include <string>
 
 #include "Enemy.h"
-#include "GameContext.h"
+#include "CommonTypes.h"
+
+using namespace std;
 
 struct BattleState {
     bool inBattle = false;
-    std::string enemyId;
+    string enemyId;
+    string encounterId;
     int enemyHealth = 0;
     bool playerGuarding = false;
     bool awaitingBananaChoice = false;
@@ -23,17 +26,20 @@ class CombatSystem {
 public:
     void initializeEnemies();
 
-    ActionResult startBattle(const std::string& enemyId, GameContext& ctx);
-    ActionResult performBattleAction(const std::string& action,
-                                     const std::string& target,
+    ActionResult startBattle(const string& enemyId, GameContext& ctx);
+    ActionResult performBattleAction(const string& action,
+                                     const string& target,
                                      GameContext& ctx);
     ActionResult chooseEscapeEndingOption(int option, GameContext& ctx);
 
     const BattleState& getBattleState() const;
     bool isInBattle() const;
+    void saveBattleState(WorldState& world) const;
+    bool restoreBattleState(GameContext& ctx);
+    void clearSavedBattleState(WorldState& world) const;
 
 private:
-    std::map<std::string, Enemy> enemies_;
+    map<string, Enemy> enemies_;
     BattleState battleState_;
     int battleTurn_ = 0;
     bool enemyArmorActive_ = false;
@@ -41,7 +47,7 @@ private:
     const Enemy* currentEnemy() const;
     ActionResult enemyCounterAttack(GameContext& ctx, bool guarded);
     ActionResult finishVictory(GameContext& ctx, const Enemy& enemy);
-    ActionResult handleBananaChoice(const std::string& target,
+    ActionResult handleBananaChoice(const string& target,
                                     GameContext& ctx);
     ActionResult handleTheft(GameContext& ctx);
     ActionResult handleFlintAttack(GameContext& ctx);

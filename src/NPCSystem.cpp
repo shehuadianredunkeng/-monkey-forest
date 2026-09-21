@@ -4,6 +4,8 @@
 #include "Player.h"
 #include "WorldState.h"
 
+using namespace std;
+
 namespace {
 constexpr const char* kScoutQuest = "flag_scout_quest_complete";
 constexpr const char* kScoutMet = "flag_scout_met";
@@ -22,7 +24,7 @@ int storyYear(const WorldState& world) {
     return stage;
 }
 
-std::string kingYearlyDialogue(const GameContext& ctx) {
+string kingYearlyDialogue(const GameContext& ctx) {
     switch (storyYear(ctx.world)) {
     case 1:
         return "岩背：第一片新叶已经张开。年轻的脚不能只踩熟悉的树枝，去果实森林看看，也学会为自己的选择负责。";
@@ -45,7 +47,7 @@ std::string kingYearlyDialogue(const GameContext& ctx) {
     }
 }
 
-std::string childYearlyDialogue(const WorldState& world) {
+string childYearlyDialogue(const WorldState& world) {
     switch (storyYear(world)) {
     case 1:
         return "豆豆：腿已经不疼啦！不过叶婆婆说今天还不许我爬高。等我长大，也要像你一样把迷路的小猴背回家。";
@@ -62,7 +64,7 @@ std::string childYearlyDialogue(const WorldState& world) {
     }
 }
 
-std::string scoutYearlyDialogue(const WorldState& world) {
+string scoutYearlyDialogue(const WorldState& world) {
     switch (storyYear(world)) {
     case 1: return "闪尾：第一年就别皱着脸嘛。树梢风大，抓紧藤蔓，摔下来哥可只负责笑。";
     case 2: return "闪尾：粮食不够就别硬撑。哥去远处探过路，真有危险喊一声，咱们先活着回来。";
@@ -77,19 +79,19 @@ std::string scoutYearlyDialogue(const WorldState& world) {
 void NPCSystem::initializeNPCs() {
     npcs_.clear();
     activeDialogueNpcId_.clear();
-    npcs_.emplace("npc_king", NPC{"npc_king", "岩背", "稳重而谨慎的老猴王。"});
-    npcs_.emplace("npc_scout", NPC{"npc_scout", "闪尾", "行动敏捷、喜欢冒险的侦察猴。"});
-    npcs_.emplace("npc_healer", NPC{"npc_healer", "叶婆婆", "熟悉森林草药的年长医护猴。"});
-    npcs_.emplace("npc_child", NPC{"npc_child", "豆豆", "总想证明自己勇敢的小猴。"});
-    npcs_.emplace("npc_hertz", NPC{"npc_hertz", "赫兹", "负责青木晶抽取工程的星猿。"});
+    npcs_.emplace("npc_king", NPC{"npc_king", "岩背"});
+    npcs_.emplace("npc_scout", NPC{"npc_scout", "闪尾"});
+    npcs_.emplace("npc_healer", NPC{"npc_healer", "叶婆婆"});
+    npcs_.emplace("npc_child", NPC{"npc_child", "豆豆"});
+    npcs_.emplace("npc_hertz", NPC{"npc_hertz", "赫兹"});
 }
 
-const NPC* NPCSystem::findNPC(const std::string& npcId) const {
+const NPC* NPCSystem::findNPC(const string& npcId) const {
     const auto it = npcs_.find(npcId);
     return it == npcs_.end() ? nullptr : &it->second;
 }
 
-std::string NPCSystem::normalizeNPCId(const std::string& npcId) const {
+string NPCSystem::normalizeNPCId(const string& npcId) const {
     if (npcId == "岩背" || npcId == "猴王" || npcId == "king") return "npc_king";
     if (npcId == "闪尾" || npcId == "scout") return "npc_scout";
     if (npcId == "叶婆婆" || npcId == "healer") return "npc_healer";
@@ -98,9 +100,9 @@ std::string NPCSystem::normalizeNPCId(const std::string& npcId) const {
     return npcId;
 }
 
-ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
+ActionResult NPCSystem::talkToNPC(const string& npcId, GameContext& ctx) {
     if (npcs_.empty()) initializeNPCs();
-    const std::string id = normalizeNPCId(npcId);
+    const string id = normalizeNPCId(npcId);
     if (!findNPC(id)) return {false, "这里没有这个角色。", false, false};
     activeDialogueNpcId_.clear();
 
@@ -115,7 +117,7 @@ ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
         ctx.player.getReputation() >= 60)
         return completeNPCQuest(id, ctx);
 
-    std::string text;
+    string text;
     if (id == "npc_king") {
         text = kingYearlyDialogue(ctx);
     } else if (id == "npc_scout") {
@@ -172,11 +174,11 @@ ActionResult NPCSystem::talkToNPC(const std::string& npcId, GameContext& ctx) {
     return {true, text, false, false};
 }
 
-ActionResult NPCSystem::chooseNPCDialogue(const std::string& npcId,
+ActionResult NPCSystem::chooseNPCDialogue(const string& npcId,
                                           int option,
                                           GameContext& ctx) {
     if (npcs_.empty()) initializeNPCs();
-    const std::string id = normalizeNPCId(npcId);
+    const string id = normalizeNPCId(npcId);
     if (id == "npc_child") {
         if (ctx.world.hasFlag(kChildQuest))
             return {false, "豆豆已经安全回到猴群。", false, false};
@@ -241,15 +243,15 @@ ActionResult NPCSystem::chooseNPCDialogue(const std::string& npcId,
 ActionResult NPCSystem::chooseDialogueOption(int option, GameContext& ctx) {
     if (activeDialogueNpcId_.empty())
         return {false, "当前没有等待选择的对话，请先输入 talk NPC名。", false, false};
-    const std::string npcId = activeDialogueNpcId_;
+    const string npcId = activeDialogueNpcId_;
     ActionResult result = chooseNPCDialogue(npcId, option, ctx);
     if (result.success || option == 3) activeDialogueNpcId_.clear();
     return result;
 }
 
-bool NPCSystem::npcWillHelp(const std::string& npcId,
+bool NPCSystem::npcWillHelp(const string& npcId,
                             const GameContext& ctx) const {
-    const std::string id = normalizeNPCId(npcId);
+    const string id = normalizeNPCId(npcId);
     if (id == "npc_scout")
         return ctx.world.hasFlag(kScoutQuest) && !ctx.world.hasFlag("flag_scout_left");
     if (id == "npc_king")
@@ -261,9 +263,9 @@ bool NPCSystem::npcWillHelp(const std::string& npcId,
     return false;
 }
 
-std::string NPCSystem::getNPCQuest(const std::string& npcId,
+string NPCSystem::getNPCQuest(const string& npcId,
                                    const GameContext& ctx) const {
-    const std::string id = normalizeNPCId(npcId);
+    const string id = normalizeNPCId(npcId);
     if (id == "npc_scout" && !ctx.world.hasFlag(kScoutMet))
         return "先和闪尾打个招呼，听听他能提供什么帮助。";
     if (id == "npc_scout" && !ctx.world.hasFlag(kScoutChoiceMade))
@@ -282,9 +284,9 @@ std::string NPCSystem::getNPCQuest(const std::string& npcId,
     return "当前没有可接取的任务。";
 }
 
-ActionResult NPCSystem::completeNPCQuest(const std::string& npcId,
+ActionResult NPCSystem::completeNPCQuest(const string& npcId,
                                          GameContext& ctx) {
-    const std::string id = normalizeNPCId(npcId);
+    const string id = normalizeNPCId(npcId);
     if (id == "npc_scout") {
         if (ctx.world.hasFlag(kScoutQuest))
             return {false, "闪尾的任务已经完成。", false, false};

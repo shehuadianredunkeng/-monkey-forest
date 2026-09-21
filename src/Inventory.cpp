@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+using namespace std;
+
 bool Inventory::addItem(const Item& item)
 {
     if (item.getCount() <= 0)
@@ -9,7 +11,7 @@ bool Inventory::addItem(const Item& item)
         return false;
     }
 
-    auto existing = std::find_if(
+    auto existing = find_if(
         items.begin(),
         items.end(),
         [&item](const Item& stored) { return stored.getId() == item.getId(); });
@@ -29,9 +31,9 @@ bool Inventory::addItem(const Item& item)
     return true;
 }
 
-bool Inventory::removeItem(const std::string& itemId)
+bool Inventory::removeItem(const string& itemId)
 {
-    auto existing = std::find_if(
+    auto existing = find_if(
         items.begin(),
         items.end(),
         [&itemId](const Item& stored) { return stored.getId() == itemId; });
@@ -49,15 +51,15 @@ bool Inventory::removeItem(const std::string& itemId)
     return true;
 }
 
-bool Inventory::hasItem(const std::string& itemId) const
+bool Inventory::hasItem(const string& itemId) const
 {
-    return std::any_of(
+    return any_of(
         items.cbegin(),
         items.cend(),
         [&itemId](const Item& stored) { return stored.getId() == itemId; });
 }
 
-const std::vector<Item>& Inventory::getItems() const
+const vector<Item>& Inventory::getItems() const
 {
     return items;
 }

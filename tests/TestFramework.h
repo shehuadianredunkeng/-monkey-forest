@@ -3,8 +3,10 @@
 #include <stdexcept>
 #include <string>
 
-inline void assertTrue(bool condition, const std::string& message) {
+using namespace std;
+
+inline void expect(bool condition, const string& message) {
     if (!condition) {
-        throw std::runtime_error(message);
+        throw runtime_error(message);
     }
 }

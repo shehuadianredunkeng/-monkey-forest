@@ -5,12 +5,14 @@
 
 #include <string>
 
-ActionResult takeItem(const std::string& itemId, GameContext& ctx);
+using namespace std;
 
-ActionResult useItem(const std::string& itemId, GameContext& ctx);
+ActionResult takeItem(const string& itemId, GameContext& ctx);
+
+ActionResult useItem(const string& itemId, GameContext& ctx);
 
 ActionResult trainSkill(SkillType type, GameContext& ctx);
 
 ActionResult rest(GameContext& ctx);
 
-std::string showInventory(const Player& player);
+string showInventory(const Player& player);

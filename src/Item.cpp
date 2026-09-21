@@ -4,37 +4,39 @@
 #include <limits>
 #include <utility>
 
+using namespace std;
+
 namespace
 {
 int addClampedToNonNegative(int value, int delta)
 {
     const long long result = static_cast<long long>(value) + delta;
-    return static_cast<int>(std::clamp(
+    return static_cast<int>(clamp(
         result,
         0LL,
-        static_cast<long long>(std::numeric_limits<int>::max())));
+        static_cast<long long>(numeric_limits<int>::max())));
 }
 } // namespace
 
-Item::Item(std::string id, std::string name, int count)
-    : Item(std::move(id), std::move(name), false, count)
+Item::Item(string id, string name, int count)
+    : Item(move(id), move(name), false, count)
 {
 }
 
-Item::Item(std::string id, std::string name, bool important, int count)
-    : id(std::move(id)),
-      name(std::move(name)),
+Item::Item(string id, string name, bool important, int count)
+    : id(move(id)),
+      name(move(name)),
       important(important),
-      count(std::max(0, count))
+      count(max(0, count))
 {
 }
 
-const std::string& Item::getId() const
+const string& Item::getId() const
 {
     return id;
 }
 
-const std::string& Item::getName() const
+const string& Item::getName() const
 {
     return name;
 }
@@ -63,9 +65,4 @@ void Item::reduceCount(int delta)
     {
         count = addClampedToNonNegative(count, -delta);
     }
-}
-
-void Item::changeCount(int delta)
-{
-    count = addClampedToNonNegative(count, delta);
 }

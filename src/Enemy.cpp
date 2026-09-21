@@ -3,13 +3,15 @@
 #include <algorithm>
 #include <utility>
 
-Enemy::Enemy(std::string id, std::string name, std::string description,
+using namespace std;
+
+Enemy::Enemy(string id, string name,
              int maxHealth, int attack, int defense, int reputationReward)
-    : Character(std::move(id), std::move(name), std::move(description)),
-      maxHealth_(std::max(1, maxHealth)),
-      attack_(std::max(1, attack)),
-      defense_(std::max(0, defense)),
-      reputationReward_(std::max(0, reputationReward)) {}
+    : Character(move(id), move(name)),
+      maxHealth_(max(1, maxHealth)),
+      attack_(max(1, attack)),
+      defense_(max(0, defense)),
+      reputationReward_(max(0, reputationReward)) {}
 
 int Enemy::getMaxHealth() const { return maxHealth_; }
 int Enemy::getAttack() const { return attack_; }

@@ -1,38 +1,107 @@
-# 4号模块联调说明
+# 4号玩家系统与主循环联调说明
 
-## 已实现范围
+## 一、负责范围
 
-- `Item`：正式物品 ID 对应的基础数据、关键物品标记和非负数量管理。
-- `Inventory`：8 个不同物品槽位、同 ID 堆叠、单件删除和关键物品保护。
-- `Player`：属性边界、四项技能、背包代理接口和当前位置。
-- `PlayerActions`：`takeItem`、`useItem`、`trainSkill`、`rest`、`showInventory`。
+4号负责玩家属性、技能、背包、物品使用和游戏主循环，并承担最终界面的输入与显示衔接。地图数据和房间连接归1号，主线剧情归2号，NPC与战斗规则归3号，存档底层和结局判定归5号。
 
-## 公共接口处理
+## 二、4号修改的文件
 
-- `Player` 和 `Inventory` 严格使用 Final 1.0 的公开接口。
-- 仓库当前把 `GameContext` 定义在 `CommonTypes.h`，因此本模块直接使用该定义，未创建第二套 `GameContext`。
-- 未创建 `SkillSystem`、`GameLoop`、`WorldState` 或 `main`。
-- `tests/TestSupport.cpp` 仅把占位实现 `Player::getCurrentRoomId()` 的返回类型同步为 Final 1.0 的 `const std::string&`，用于保持原地图测试可编译。
+### 1. 玩家与物品核心文件
 
-## 关键物品规则
+| 文件 | 修改内容 |
+| --- | --- |
+| `include/Item.h`、`src/Item.cpp` | 定义物品编号、名称、类型和使用效果等基础数据。 |
+| `include/Inventory.h`、`src/Inventory.cpp` | 实现背包添加、移除、查找、堆叠与容量检查；容量统一由 `Inventory::MAX_SLOTS` 管理，当前为12格。 |
+| `include/Player.h`、`src/Player.cpp` | 管理生命、体力、力量、智慧、声望、技能等级和背包等玩家状态。 |
+| `include/PlayerActions.h`、`src/PlayerActions.cpp` | 处理拾取、使用、丢弃、休息、训练等玩家操作，并通过 `ActionResult` 返回结果及是否消耗回合。 |
 
-`item_rope`、`item_flint` 和 `item_chip` 在 `PlayerActions` 创建时标记为关键物品。`Inventory::removeItem` 拒绝删除标记为关键的物品。普通物品每次删除一个数量单位。
+### 2. 主循环与界面联调文件
 
-## 需要后续成员联调
+| 文件 | 修改内容 |
+| --- | --- |
+| `src/main.cpp` | 串联地图、剧情、NPC、战斗、玩家、存档和结局；统一回合推进、战斗中背包及存档入口。 |
+| `include/UI/GameUI.h`、`src/UI/GameUI.cpp` | 调整剧情记录、选项颜色和界面输出；选项统一显示为黄色。 |
+| `src/UI/InteractiveGameUI.cpp` | 实现WASD移动、上下键回看剧情、切图体力消耗、右栏常驻状态与背包、全屏结局字幕等。 |
+| `.gitignore` | 忽略本地构建和调试产生的临时文件。 |
 
-1. `Room` 目前只公开只读的 `getItemIds()`，没有物品移除接口。因此 `takeItem` 成功后不能安全地从房间永久移除该物品；地图或 `WorldState` 模块需要统一决定房间物品的持久状态。
-2. `item_rope`、`item_flint`、`item_chip` 的剧情效果属于地图/事件系统；`useItem` 不修改世界状态，也不推进剧情。
-3. 所有玩家动作只设置 `ActionResult.turnConsumed`，不会直接消耗回合；最终主循环负责统一处理回合。
-4. `tests/member4_player_test.cpp` 为链接现有 `Room.cpp` 提供了测试专用的 `WorldState::hasFlag` 最小实现。整合正式 `WorldState.cpp` 后，应避免在同一测试目标中同时链接两份实现。
+### 3. 测试与说明文件
 
-## 构建与测试
+| 文件 | 修改内容 |
+| --- | --- |
+| `tests/member4_player_test.cpp` | 测试玩家属性、技能、背包与物品行为。 |
+| `tests/member4_main_test.cpp` | 测试4号模块与主循环的基础衔接。 |
+| `tests/TestSupport.cpp` | 为4号模块测试提供公共桩和辅助实现。 |
+| `tests/ui_layout_test.cpp` | 检查最终UI布局、输入规则和结局显示逻辑。 |
+| `tests/run_member4_checks.sh` | 4号早期模块检查脚本。 |
+| `docs/member-4-player.md` | 4号玩家模块使用说明。 |
+| `docs/member4-integration-notes.md` | 本联调说明。 |
+| `CMakeLists.txt` | 注册4号源码和测试目标；合并时应保留其他成员已经加入的构建项。 |
 
-仓库 CMake 已增加 `monkey_player` 和 `member4_tests` 目标。标准验证命令：
+## 三、4号负责的文件
 
-```bash
-cmake -S . -B build
-cmake --build build --config Debug
-ctest --test-dir build -C Debug --output-on-failure
-```
+- `.gitignore`
+- `docs/member4-integration-notes.md`
+- `include/UI/GameUI.h`
+- `src/UI/GameUI.cpp`
+- `src/UI/InteractiveGameUI.cpp`
+- `src/main.cpp`
+- `tests/ui_layout_test.cpp`
 
-4号开发环境未提供 CMake，因此提交前使用 `g++ 13.3.0 -std=c++17 -Wall -Wextra -Wpedantic` 分别编译并运行原地图测试和 `member4_player_test`。
+`src/Room.cpp` 由1号维护，4号没有改动。修改地图或房间连接时请改该文件，不要另建副本。
+
+## 四、主要功能变化
+
+- 探索移动只使用 `W/A/S/D`；上下箭头逐行翻阅剧情，`PageUp/PageDown` 快速翻页。
+- 只有成功切换房间才固定消耗3点体力；房间内走动不扣体力，体力不足时禁止切图。
+- 右侧状态栏常驻显示生命、体力、力量、智慧、声望、公共资源、四项技能和背包物品。
+- 结局进入独立全屏谢幕界面，不再被地图或状态框遮挡；字幕逐行显示，间隔1秒，结束后可上下回看。
+- 剧情和NPC的数字选项统一使用黄色，避免同一组选项颜色不一致。
+- 战斗中允许查看背包并使用物品，也允许存档。
+- 界面不再提示玩家输入 `guide`，当前任务直接显示在右栏。
+- 背包使用12格上限；同编号物品自动堆叠，拾取、使用和丢弃继续由玩家动作模块处理。
+
+## 五、调用其他成员的接口
+
+| 对接成员 | 4号调用的接口/数据 | 约定 |
+| --- | --- | --- |
+| 1号地图 | `InteractiveMap` 的移动、当前房间和交互结果 | 4号只处理输入、显示和切图扣体力，不修改房间连接与地形。 |
+| 2号剧情 | `EventSystem::getCurrentObjective(ctx)`、`chooseEventOption("", option, ctx)`、`resumePendingEventAfterBattle(ctx)` | 主线文本、选项结果和智慧成长路线仍以2号实现为准。 |
+| 3号NPC/战斗 | NPC交互、战斗开始与结算、成就和结局收集接口 | 4号只提供战斗输入入口及结果显示，不改敌人数值和NPC剧情。 |
+| 5号存档/结局 | `SaveSlots`、`SaveManager`、结局判定与展示数据 | 继续使用统一存档格式，不建立第二套玩家或剧情状态。 |
+
+公共约定：只有 `ActionResult.turnConsumed == true` 才推进回合。显示层不得直接改玩家、剧情、NPC或地图状态。
+
+## 六、模块归属
+
+改动或排错时，按下面的归属找人：
+
+- `Room.cpp`、房间连接和地图地形：1号。
+- `StoryText`、`EventSystem` 和主线原文：2号。
+- NPC、敌人、战斗、成就与结局收集：3号。
+- `Player`、`Inventory`、`PlayerActions`、UI 输入与主循环：4号。
+- 存档序列化和最终结局判定：5号。
+
+`main.cpp`、`CMakeLists.txt` 和 UI 文件同时承担多模块注册，改这几处要留意别覆盖别人
+新增的调用。
+
+## 七、已知限制
+
+- 战斗中存档会保存玩家、地图和剧情状态，但目前不会保存敌人的剩余生命；读档后该敌人会以完整生命重新进入战斗。
+- 右栏背包空间有限，物品过多时只显示摘要，玩家可进入完整背包界面查看。
+- 本目录同时包含1、2、3号的代码，但这些文件不由4号维护；判断责任时以本说明的文件边界为准。
+
+## 八、验证结果
+
+Visual Studio 2022 Release 构建成功，以下8组测试全部通过：
+
+- `ui_layout_tests`
+- `map_tests`
+- `member4_tests`
+- `member3_tests`
+- `member2_tests`
+- `member5_tests`
+- `interactive_map_tests`
+- `save_slots_tests`
+
+其中 `member2_tests` 已验证：即使树冠试炼没有选择智慧奖励，后续研究事件仍可使智慧达到4。
+

@@ -2,11 +2,11 @@
 
 #include <utility>
 
-Character::Character(std::string id, std::string name, std::string description)
-    : id_(std::move(id)),
-      name_(std::move(name)),
-      description_(std::move(description)) {}
+using namespace std;
 
-const std::string& Character::getId() const { return id_; }
-const std::string& Character::getName() const { return name_; }
-const std::string& Character::getDescription() const { return description_; }
+Character::Character(string id, string name)
+    : id_(move(id)),
+      name_(move(name)) {}
+
+const string& Character::getId() const { return id_; }
+const string& Character::getName() const { return name_; }

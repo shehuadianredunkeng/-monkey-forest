@@ -6,6 +6,8 @@
 #include <map>
 #include <string>
 
+using namespace std;
+
 class Player
 {
 public:
@@ -24,14 +26,14 @@ public:
     int getSkillLevel(SkillType type) const;
     void changeSkillLevel(SkillType type, int delta);
 
-    bool hasItem(const std::string& itemId) const;
+    bool hasItem(const string& itemId) const;
     bool addItem(const Item& item);
-    bool removeItem(const std::string& itemId);
+    bool removeItem(const string& itemId);
 
     const Inventory& getInventory() const;
 
-    const std::string& getCurrentRoomId() const;
-    void setCurrentRoomId(const std::string& roomId);
+    const string& getCurrentRoomId() const;
+    void setCurrentRoomId(const string& roomId);
 
 private:
     int health = 100;
@@ -40,13 +42,12 @@ private:
     int wisdom = 1;
     int reputation = 0;
 
-    std::map<SkillType, int> skills = {
-        {SkillType::Gather, 1},
+    map<SkillType, int> skills = {
         {SkillType::Climb, 1},
         {SkillType::Combat, 1},
         {SkillType::Leadership, 1},
     };
 
     Inventory inventory;
-    std::string currentRoomId = "room_tree";
+    string currentRoomId = "room_tree";
 };

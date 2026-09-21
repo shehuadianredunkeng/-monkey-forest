@@ -4,6 +4,7 @@
 #include "NPCSystem.h"
 #include "Player.h"
 #include "Room.h"
+#include "TestFramework.h"
 #include "WorldState.h"
 
 #include <iostream>
@@ -12,18 +13,16 @@
 #include <stdexcept>
 #include <string>
 
+using namespace std;
+
 namespace {
 struct FakeWorldData {
     int stage = 1;
     int turns = 0;
-    std::map<ResourceType, int> resources;
-    std::set<std::string> flags;
+    map<ResourceType, int> resources;
+    set<string> flags;
 };
-std::map<const WorldState*, FakeWorldData> worlds;
-
-void expect(bool condition, const std::string& message) {
-    if (!condition) throw std::runtime_error(message);
-}
+map<const WorldState*, FakeWorldData> worlds;
 }
 
 int WorldState::getStage() const { return worlds[this].stage; }
@@ -33,11 +32,15 @@ void WorldState::consumeTurn() { ++worlds[this].turns; }
 void WorldState::resetTurnCount() { worlds[this].turns = 0; }
 int WorldState::getResource(ResourceType type) const { return worlds[this].resources[type]; }
 void WorldState::changeResource(ResourceType type, int delta) { worlds[this].resources[type] += delta; }
-bool WorldState::hasFlag(const std::string& flag) const { return worlds[this].flags.count(flag) != 0; }
-void WorldState::setFlag(const std::string& flag) { worlds[this].flags.insert(flag); }
-void WorldState::removeFlag(const std::string& flag) { worlds[this].flags.erase(flag); }
+bool WorldState::hasFlag(const string& flag) const { return worlds[this].flags.count(flag) != 0; }
+void WorldState::setFlag(const string& flag) { worlds[this].flags.insert(flag); }
+void WorldState::removeFlag(const string& flag) { worlds[this].flags.erase(flag); }
+vector<string> WorldState::getFlags() const {
+    return {worlds[this].flags.begin(), worlds[this].flags.end()};
+}
 
 void testNpcTasksUsePlayerAndWorldInterfaces() {
+    worlds.clear();
     Player player;
     WorldState world;
     auto rooms = createAllRooms();
@@ -46,7 +49,7 @@ void testNpcTasksUsePlayerAndWorldInterfaces() {
     npcs.initializeNPCs();
 
     expect(npcs.talkToNPC("闪尾", ctx).success, "Chinese NPC alias should work");
-    expect(npcs.talkToNPC("闪尾", ctx).message.find("1.") != std::string::npos,
+    expect(npcs.talkToNPC("闪尾", ctx).message.find("1.") != string::npos,
            "second scout talk should show choices");
     expect(npcs.chooseDialogueOption(2, ctx).success,
            "scout dialogue choice should work");
@@ -66,7 +69,7 @@ void testNpcTasksUsePlayerAndWorldInterfaces() {
 
     expect(npcs.talkToNPC("豆豆", ctx).success,
            "talking to child should find the injured child");
-    expect(npcs.talkToNPC("豆豆", ctx).message.find("请直接输入") != std::string::npos,
+    expect(npcs.talkToNPC("豆豆", ctx).message.find("请直接输入") != string::npos,
            "second child talk should open bare-number choices");
     expect(!npcs.chooseDialogueOption(2, ctx).success,
            "child treatment must require herb");
@@ -84,9 +87,9 @@ void testNpcTasksUsePlayerAndWorldInterfaces() {
            "king support should complete through talk");
     expect(world.hasFlag("flag_king_support"), "king support flag missing");
 
-    const std::string help = getCommandHelp();
-    expect(help.find("quest") == std::string::npos &&
-               help.find("finish") == std::string::npos,
+    const string help = getCommandHelp();
+    expect(help.find("quest") == string::npos &&
+               help.find("finish") == string::npos,
            "player help must not expose quest or finish commands");
 
     // 3号发布入队状态；地图是否显示该NPC由1号根据此状态处理。
@@ -98,6 +101,7 @@ void testNpcTasksUsePlayerAndWorldInterfaces() {
 }
 
 void testRepeatedEscapeEndingAndScoutDeparture() {
+    worlds.clear();
     Player player;
     WorldState world;
     auto rooms = createAllRooms();
@@ -111,8 +115,11 @@ void testRepeatedEscapeEndingAndScoutDeparture() {
         expect(combat.startBattle("enemy_bees", ctx).success, "escape battle should start");
         const ActionResult escaped = combat.performBattleAction("逃跑", "", ctx);
         expect(escaped.success, "escape should succeed");
+        if (count == 2)
+            expect(escaped.message.find("和你一起走") != string::npos,
+                   "third escape should foreshadow the scout invitation");
         if (count == 3)
-            expect(escaped.message.find("闯荡天涯") != std::string::npos,
+            expect(escaped.message.find("闯荡天涯") != string::npos,
                    "fourth escape should trigger invitation");
     }
     const ActionResult refused = combat.chooseEscapeEndingOption(2, ctx);
@@ -148,11 +155,38 @@ void testRepeatedEscapeEndingAndScoutDeparture() {
 }
 
 void testCollectionSystemSupportsNewAndLegacyEndings() {
+    worlds.clear();
     WorldState world;
     CollectionSystem collections;
-    expect(collections.endings().size() == 8, "all current endings must be registered");
+    expect(collections.endings().size() == 12, "all current endings must be registered");
+    for (const CollectionEntry& ending : collections.endings()) {
+        expect((ending.description.find("[解锁条件：") != string::npos ||
+                ending.description.find("[触发条件：") != string::npos) &&
+                   ending.description.find("[评价：") != string::npos,
+               "each ending collection entry should show condition and evaluation: " + ending.id);
+    }
+    for (const CollectionEntry& achievement : collections.achievements()) {
+        expect(achievement.description.find("[解锁条件：") != string::npos &&
+                   achievement.description.find("[评价：") != string::npos,
+               "each achievement collection entry should show condition and evaluation: " + achievement.id);
+    }
+    const string lockedSummary = collections.getEndingCollectionText(world, false);
+    expect(lockedSummary.find("？？？") != string::npos,
+           "locked endings must hide their names");
+    expect(lockedSummary.find("青木英雄") == string::npos &&
+               lockedSummary.find("达成条件") == string::npos &&
+               lockedSummary.find("评价：") == string::npos,
+           "compact collection must hide locked names, conditions and evaluations");
     expect(collections.unlockEnding("ending_resist", world),
            "registered main ending should unlock");
+    const string unlockedSummary = collections.getEndingCollectionText(world, false);
+    expect(unlockedSummary.find("青木英雄") != string::npos &&
+               unlockedSummary.find("评价：") != string::npos &&
+               unlockedSummary.find("达成条件") == string::npos,
+           "compact collection must show only unlocked name and evaluation");
+    const string detailed = collections.getEndingCollectionText(world, true);
+    expect(detailed.find("达成条件") != string::npos,
+           "Y-mode collection text must reveal every condition");
     expect(collections.unlockedEndingCount(world) == 1,
            "ending collection should count without duplicates");
     expect(collections.unlockEnding("ending_resist", world) &&
@@ -167,9 +201,77 @@ void testCollectionSystemSupportsNewAndLegacyEndings() {
 
     WorldState legacyWorld;
     legacyWorld.setFlag("flag_bad_ending_gluttony");
+    legacyWorld.setFlag("flag_hidden_ending_spark");
     collections.syncLegacyFlags(legacyWorld);
     expect(collections.isEndingUnlocked("ending_gluttony", legacyWorld),
            "old ending flags should be imported");
+    expect(collections.isEndingUnlocked("ending_spark", legacyWorld),
+           "spark ending flag should enter the collection");
+}
+
+void testCombatSkillUsesIncreasingVictoryThresholds() {
+    worlds.clear();
+    Player player;
+    player.changeStrength(4);
+    WorldState world;
+    auto rooms = createAllRooms();
+    GameContext ctx{player, world, rooms};
+    CombatSystem combat;
+    combat.initializeEnemies();
+
+    for (int victory = 1; victory <= 26; ++victory) {
+        const string encounter = "enemy_raider@training_" +
+                                      to_string(victory);
+        expect(combat.startBattle(encounter, ctx).success,
+               "training enemy should start");
+        ActionResult result;
+        while (combat.isInBattle())
+            result = combat.performBattleAction("attack", "", ctx);
+        player.changeHealth(100);
+        const int expectedLevel = victory >= 26 ? 5 :
+                                  victory >= 18 ? 4 :
+                                  victory >= 11 ? 3 :
+                                  victory >= 5 ? 2 : 1;
+        expect(player.getSkillLevel(SkillType::Combat) == expectedLevel,
+               "combat skill must use 5/6/7/8 increasing thresholds");
+        if (victory == 5 || victory == 11 || victory == 18 || victory == 26) {
+            expect(result.message.find("战斗技能提升") != string::npos,
+                   "each victory milestone must report a level-up");
+            expect(result.message.find("生命+50") != string::npos,
+                   "combat level-up must report its healing reward");
+        }
+    }
+    expect(player.getSkillLevel(SkillType::Combat) == 5,
+           "combat skill maximum must be five");
+    expect(world.hasFlag("flag_achievement_combat_god_candidate") &&
+               world.hasFlag("flag_achievement_combat_god"),
+           "level three and five combat achievements must unlock");
+}
+
+void testBattleStateCanResumeWithoutHealingEnemy() {
+    worlds.clear();
+    Player player;
+    player.changeWisdom(2);
+    WorldState world;
+    auto rooms = createAllRooms();
+    GameContext ctx{player, world, rooms};
+    CombatSystem combat;
+    combat.initializeEnemies();
+    expect(combat.startBattle("enemy_drone@room_river@3@3", ctx).success,
+           "drone battle should start");
+    expect(combat.performBattleAction("破解", "", ctx).success,
+           "drone must accept repeated mechanical hacking");
+    const int savedEnemyHealth = combat.getBattleState().enemyHealth;
+    const int savedPlayerHealth = player.getHealth();
+    combat.saveBattleState(world);
+
+    CombatSystem restored;
+    restored.initializeEnemies();
+    expect(restored.restoreBattleState(ctx), "saved battle should restore");
+    expect(restored.isInBattle() &&
+               restored.getBattleState().enemyHealth == savedEnemyHealth &&
+               player.getHealth() == savedPlayerHealth,
+           "battle load must preserve both enemy and player health");
 }
 
 void testStoryEventAchievementsUseMember2Flags() {
@@ -208,9 +310,9 @@ void testYearlyNpcDialogueAndChildReturnFlags() {
     NPCSystem npcs;
     npcs.initializeNPCs();
 
-    std::set<std::string> kingLines;
-    std::set<std::string> childLines;
-    std::set<std::string> scoutLines;
+    set<string> kingLines;
+    set<string> childLines;
+    set<string> scoutLines;
     world.setFlag("flag_child_rescued");
     world.setFlag("flag_scout_quest_complete");
     world.setFlag("flag_scout_help");
@@ -268,7 +370,7 @@ void testBattleVictoryFlagsKeepMember2PendingFlags() {
 
         expect(combat.startBattle(battleCase.enemyId, ctx).success,
                "story-linked battle should start");
-        if (std::string(battleCase.enemyId) == "enemy_hertz")
+        if (string(battleCase.enemyId) == "enemy_hertz")
             expect(combat.performBattleAction("analyze", "", ctx).success,
                    "Hertz armor analysis should succeed");
         while (combat.isInBattle())
@@ -283,6 +385,7 @@ void testBattleVictoryFlagsKeepMember2PendingFlags() {
 }
 
 void testTheftAndBeeDefenseAchievements() {
+    worlds.clear();
     Player player;
     WorldState world;
     auto rooms = createAllRooms();
@@ -320,6 +423,7 @@ void testTheftAndBeeDefenseAchievements() {
 }
 
 void testEscapeSkillAndHertzBananaChoice() {
+    worlds.clear();
     Player player;
     WorldState world;
     auto rooms = createAllRooms();
@@ -331,12 +435,13 @@ void testEscapeSkillAndHertzBananaChoice() {
     expect(!combat.performBattleAction("逃跑", "", ctx).success,
            "escape must stay locked before scout quest");
     world.setFlag("flag_skill_escape_unlocked");
+    world.setFlag("flag_scout_help");
     const ActionResult escaped = combat.performBattleAction("逃跑", "", ctx);
-    expect(escaped.success && escaped.message.find("闪尾从天而降") != std::string::npos,
+    expect(escaped.success && escaped.message.find("闪尾从天而降") != string::npos,
            "unlocked escape text mismatch");
 
     world.setFlag("flag_scout_banana_promise");
-    expect(combat.startBattle("enemy_hertz", ctx).message.find("香蕉 1/2/3") != std::string::npos,
+    expect(combat.startBattle("enemy_hertz", ctx).message.find("香蕉 1/2/3") != string::npos,
            "Hertz should offer banana");
     expect(!combat.performBattleAction("攻击", "", ctx).success,
            "normal actions must wait for banana choice");
@@ -346,12 +451,14 @@ void testEscapeSkillAndHertzBananaChoice() {
 }
 
 void testHertzBananaBadEndings() {
+    worlds.clear();
     Player player;
     WorldState world;
     auto rooms = createAllRooms();
     GameContext ctx{player, world, rooms};
     CombatSystem combat;
     world.setFlag("flag_scout_banana_promise");
+    world.setFlag("flag_scout_help");
     combat.initializeEnemies();
     expect(combat.startBattle("enemy_hertz", ctx).success, "Hertz should start");
     expect(combat.performBattleAction("banana", "2", ctx).success,
@@ -363,7 +470,39 @@ void testHertzBananaBadEndings() {
            "second banana bad ending flag missing");
 }
 
+void testHertzStoryNeverLeaksIntoOtherBattles() {
+    worlds.clear();
+    Player player;
+    WorldState world;
+    auto rooms = createAllRooms();
+    GameContext ctx{player, world, rooms};
+    world.setFlag("flag_scout_banana_promise");
+
+    CombatSystem raider;
+    const ActionResult raiderStart =
+        raider.startBattle("enemy_raider@room_forest@4@2", ctx);
+    expect(raiderStart.success, "raider battle should start");
+    expect(raiderStart.message.find("赫兹") == string::npos &&
+               raiderStart.message.find("巴拿拿") == string::npos &&
+               !raider.getBattleState().awaitingBananaChoice,
+           "Hertz banana scene must never appear for a roaming enemy");
+
+    CombatSystem winter;
+    const ActionResult winterStart = winter.startBattle(
+        "enemy_season_guardian_winter@room_cave@8@4", ctx);
+    expect(winterStart.success && winter.getBattleState().enemyHealth >= 50,
+           "winter guardian should use the increased boss health");
+    expect(winterStart.message.find("每第三回合") != string::npos &&
+               winterStart.message.find("赫兹") == string::npos,
+           "seasonal boss should show its own combat hint");
+    const ActionResult failedTheft =
+        winter.performBattleAction("steal", "", ctx);
+    expect(failedTheft.message.find("智慧达到2级") != string::npos,
+           "seasonal relic theft should require preparation");
+}
+
 void testRobotHackAndHertzArmor() {
+    worlds.clear();
     Player player;
     WorldState world;
     auto rooms = createAllRooms();
@@ -392,7 +531,55 @@ void testRobotHackAndHertzArmor() {
     expect(world.hasFlag("flag_hertz_defeated"), "Hertz victory flag missing");
 }
 
+void testPersistentTheftAndCowardEnding() {
+    worlds.clear();
+    Player player;
+    WorldState world;
+    auto rooms = createAllRooms();
+    GameContext ctx{player, world, rooms};
+    CombatSystem combat;
+    world.setFlag("flag_skill_escape_unlocked");
+    world.setFlag("flag_scout_help");
+
+    const string encounter = "enemy_raider@room_tree@0@0";
+    expect(combat.startBattle(encounter, ctx).success, "dynamic enemy should start");
+    expect(combat.performBattleAction("steal", "", ctx).success,
+           "first lifetime theft should work");
+    expect(combat.performBattleAction("escape", "", ctx).success,
+           "escape after theft should work");
+    expect(combat.startBattle(encounter, ctx).success,
+           "escaped enemy should remain available");
+    const ActionResult empty = combat.performBattleAction("steal", "", ctx);
+    expect(!empty.success && empty.message.find("一贫如洗") != string::npos,
+           "same enemy must not be farmed by escaping");
+    expect(combat.performBattleAction("escape", "", ctx).success,
+           "second escape should work");
+
+    for (int count = 2; count < 4; ++count) {
+        expect(combat.startBattle("enemy_raider@room_tree@" +
+                                  to_string(count) + "@0", ctx).success,
+               "escape sequence battle should start");
+        expect(combat.performBattleAction("escape", "", ctx).success,
+               "escape sequence should continue");
+    }
+    expect(world.hasFlag("flag_pending_scout_wander_choice"),
+           "fourth escape should invite the player");
+    expect(combat.chooseEscapeEndingOption(2, ctx).success,
+           "refusing scout should remain valid");
+    for (int count = 4; count < 5; ++count) {
+        expect(combat.startBattle("enemy_raider@room_tree@" +
+                                  to_string(count) + "@0", ctx).success,
+               "solo escape battle should start");
+        expect(combat.performBattleAction("escape", "", ctx).success,
+               "solo escape should remain possible after scout leaves");
+    }
+    expect(world.hasFlag("flag_escape_normal_endings_locked") &&
+               !world.hasFlag("flag_bad_ending_coward"),
+           "fifth escape should lock normal routes but wait for final choice");
+}
+
 void testNpcPlacementMatchesQuestFlow() {
+    worlds.clear();
     Player player;
     WorldState world;
     auto rooms = createAllRooms();
@@ -403,12 +590,93 @@ void testNpcPlacementMatchesQuestFlow() {
            "Hertz must be visible in base");
     expect(rooms.at("room_river").getNPCIds().front() == "npc_child",
            "child rescue NPC must be in river");
-    // NPC显示与离队后的地图隐藏由1号Room模块负责；3号只保证标准ID与
-    // 中英文名称均能进入同一套对话逻辑。
+    // 这里只验证标准 ID 和中英文名称都能进同一套对话逻辑。
     expect(npcs.talkToNPC("scout", ctx).success,
            "member-1 standard scout ID alias should open dialogue");
     expect(npcs.talkToNPC("闪尾", ctx).success,
            "Chinese scout name should open the same dialogue flow");
+}
+
+void testBattleActionsOnlyRefreshMapAfterLeavingBattle() {
+    auto withFreshBattle = [](const string& enemyId, auto&& body) {
+        worlds.clear();
+        Player player;
+        WorldState world;
+        auto rooms = createAllRooms();
+        GameContext ctx{player, world, rooms};
+        CombatSystem combat;
+        combat.initializeEnemies();
+        body(ctx, combat);
+    };
+
+    auto expectOngoingAction = [&](const string& enemyId,
+                                   const string& action,
+                                   const string& target = "",
+                                   bool setupForHertz = false) {
+        withFreshBattle(enemyId, [&](GameContext& ctx, CombatSystem& combat) {
+            if (setupForHertz) {
+                ctx.player.changeWisdom(3);
+                ctx.world.setFlag("flag_complete_log");
+            }
+            if (action == "hack") ctx.player.changeWisdom(3);
+            if (action == "use") {
+                ctx.player.changeHealth(-20);
+                ctx.player.addItem(Item("item_herb", "草药"));
+            }
+            expect(combat.startBattle(enemyId, ctx).success, "battle setup failed: " + enemyId);
+            const ActionResult result = combat.performBattleAction(action, target, ctx);
+            expect(result.success, "battle action failed: " + action);
+            expect(combat.isInBattle(), "ongoing battle action should not leave battle: " + action);
+            expect(!result.turnConsumed,
+                   "ongoing battle action must not refresh map turns: " + action);
+        });
+    };
+
+    expectOngoingAction("enemy_robot", "attack");
+    expectOngoingAction("enemy_robot", "guard");
+    expectOngoingAction("enemy_robot", "steal");
+    expectOngoingAction("enemy_robot", "hack");
+    expectOngoingAction("enemy_robot", "use", "item_herb");
+    expectOngoingAction("enemy_hertz", "analyze", "", true);
+
+    withFreshBattle("enemy_hertz", [](GameContext& ctx, CombatSystem& combat) {
+        ctx.world.setFlag("flag_scout_banana_promise");
+        ctx.world.setFlag("flag_scout_help");
+        expect(combat.startBattle("enemy_hertz", ctx).success, "hertz setup failed");
+        const ActionResult banana = combat.performBattleAction("banana", "1", ctx);
+        expect(banana.success && combat.isInBattle() && !banana.turnConsumed,
+               "banana choice must not refresh map while battle continues");
+    });
+
+    withFreshBattle("enemy_hertz", [](GameContext& ctx, CombatSystem& combat) {
+        ctx.world.setFlag("flag_scout_banana_promise");
+        ctx.world.setFlag("flag_scout_help");
+        ctx.world.setFlag("flag_scout_left");
+        const ActionResult started = combat.startBattle("enemy_hertz", ctx);
+        expect(started.success &&
+                   started.message.find("把巴拿拿给闪尾") == string::npos &&
+                   !combat.getBattleState().awaitingBananaChoice,
+               "departed scout must not participate in the Hertz banana scene");
+    });
+
+    withFreshBattle("enemy_bees", [](GameContext& ctx, CombatSystem& combat) {
+        ctx.player.changeStrength(20);
+        expect(combat.startBattle("enemy_bees", ctx).success, "victory setup failed");
+        ActionResult victory;
+        while (combat.isInBattle())
+            victory = combat.performBattleAction("attack", "", ctx);
+        expect(victory.success && !combat.isInBattle() && victory.turnConsumed,
+               "victory should refresh map once after leaving battle");
+    });
+
+    withFreshBattle("enemy_raider", [](GameContext& ctx, CombatSystem& combat) {
+        ctx.world.setFlag("flag_skill_escape_unlocked");
+        ctx.world.setFlag("flag_scout_help");
+        expect(combat.startBattle("enemy_raider", ctx).success, "escape setup failed");
+        const ActionResult escaped = combat.performBattleAction("escape", "", ctx);
+        expect(escaped.success && !combat.isInBattle() && escaped.turnConsumed,
+               "successful escape should refresh map once after leaving battle");
+    });
 }
 
 int main() {
@@ -416,16 +684,21 @@ int main() {
         testNpcTasksUsePlayerAndWorldInterfaces();
         testTheftAndBeeDefenseAchievements();
         testRobotHackAndHertzArmor();
+        testPersistentTheftAndCowardEnding();
         testEscapeSkillAndHertzBananaChoice();
         testHertzBananaBadEndings();
+        testHertzStoryNeverLeaksIntoOtherBattles();
         testRepeatedEscapeEndingAndScoutDeparture();
         testCollectionSystemSupportsNewAndLegacyEndings();
+        testCombatSkillUsesIncreasingVictoryThresholds();
+        testBattleStateCanResumeWithoutHealingEnemy();
         testStoryEventAchievementsUseMember2Flags();
         testYearlyNpcDialogueAndChildReturnFlags();
         testBattleVictoryFlagsKeepMember2PendingFlags();
         testNpcPlacementMatchesQuestFlow();
-    } catch (const std::exception& error) {
-        std::cerr << "member3_npc_combat_test failed: " << error.what() << '\n';
+        testBattleActionsOnlyRefreshMapAfterLeavingBattle();
+    } catch (const exception& error) {
+        cerr << "member3_npc_combat_test failed: " << error.what() << '\n';
         return 1;
     }
     return 0;

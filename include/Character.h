@@ -2,17 +2,17 @@
 
 #include <string>
 
+using namespace std;
+
 class Character {
 public:
-    Character(std::string id, std::string name, std::string description);
+    Character(string id, string name);
     virtual ~Character() = default;
 
-    const std::string& getId() const;
-    const std::string& getName() const;
-    const std::string& getDescription() const;
+    const string& getId() const;
+    const string& getName() const;
 
 protected:
-    std::string id_;
-    std::string name_;
-    std::string description_;
+    string id_;
+    string name_;
 };

@@ -2,10 +2,12 @@
 
 #include "Character.h"
 
+using namespace std;
+
 class Enemy : public Character {
 public:
-    Enemy() : Character("", "", "") {}
-    Enemy(std::string id, std::string name, std::string description,
+    Enemy() : Character("", "") {}
+    Enemy(string id, string name,
           int maxHealth, int attack, int defense, int reputationReward);
 
     int getMaxHealth() const;

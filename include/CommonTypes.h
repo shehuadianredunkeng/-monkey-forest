@@ -3,12 +3,13 @@
 #include <map>
 #include <string>
 
+using namespace std;
+
 class Player;
 class Room;
 class WorldState;
 
 enum class SkillType {
-    Gather,
     Climb,
     Combat,
     Leadership
@@ -23,7 +24,7 @@ enum class ResourceType {
 
 struct ActionResult {
     bool success = false;
-    std::string message;
+    string message;
     bool turnConsumed = false;
     bool stageCompleted = false;
 };
@@ -31,5 +32,5 @@ struct ActionResult {
 struct GameContext {
     Player& player;
     WorldState& world;
-    std::map<std::string, Room>& rooms;
+    map<string, Room>& rooms;
 };

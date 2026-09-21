@@ -1,0 +1,6 @@
+build-interactive/
+build-member4/
+release-interactive/
+build/
+__cmake_systeminformation/
+*.zip

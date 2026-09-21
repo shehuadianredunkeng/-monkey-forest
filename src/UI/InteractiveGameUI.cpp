@@ -1,0 +1,665 @@
+#include "UI/InteractiveGameUI.h"
+
+#include "CombatSystem.h"
+#include "CommonUtils.h"
+#include "Player.h"
+#include "Room.h"
+#include "UI/TextLayout.h"
+#include "WorldState.h"
+
+#include <algorithm>
+#include <chrono>
+#include <thread>
+
+using namespace std;
+
+namespace UI {
+namespace {
+
+
+Color messageColor(const wstring& text) {
+    if (text.find(L"[触发条件：") != wstring::npos ||
+        text.find(L"[解锁条件：") != wstring::npos)
+        return Color::Hint;
+    if (text.find(L"[结局评价：") != wstring::npos ||
+        text.find(L"[评价：") != wstring::npos)
+        return Color::Achievement;
+    if (text.find(L"【成就解锁】") != wstring::npos ||
+        text.find(L"【成就收集】") != wstring::npos)
+        return Color::Achievement;
+    if (text.find(L"【结局达成】") != wstring::npos ||
+        text.find(L"【隐藏结局") != wstring::npos ||
+        text.find(L"【坏结局") != wstring::npos ||
+        text.find(L"【普通结局") != wstring::npos ||
+        text.find(L"【结局：") != wstring::npos)
+        return Color::Ending;
+    if (text.find(L"失败") != wstring::npos ||
+        text.find(L"无法") != wstring::npos ||
+        text.find(L"不足") != wstring::npos) return Color::Error;
+    if (text.find(L"闪尾") != wstring::npos ||
+        text.find(L"岩背") != wstring::npos ||
+        text.find(L"叶婆婆") != wstring::npos ||
+        text.find(L"豆豆") != wstring::npos ||
+        text.find(L"赫兹") != wstring::npos ||
+        text.find(L"拾取") != wstring::npos ||
+        text.find(L"获得") != wstring::npos)
+        return Color::Item;
+    if (text.find(L"获得") != wstring::npos ||
+        text.find(L"成功") != wstring::npos ||
+        text.find(L"完成") != wstring::npos ||
+        text.find(L"+1") != wstring::npos) return Color::Success;
+    if (text.find(L"提示") != wstring::npos ||
+        text.find(L"任务") != wstring::npos) return Color::Hint;
+    return Color::Normal;
+}
+
+bool isNumberedChoice(const wstring& text) {
+    const size_t first = text.find_first_not_of(L" \t");
+    if (first == wstring::npos) return false;
+    const wchar_t number = text[first];
+    if (number < L'1' || number > L'9') return false;
+    if (first + 1 >= text.size()) return false;
+    const wchar_t separator = text[first + 1];
+    return separator == L'.' || separator == L'、' || separator == L')' ||
+           separator == L'）' || separator == L':' || separator == L'：';
+}
+
+wstring joinGlyphs(const vector<wstring>& glyphs,
+                        size_t from, size_t to) {
+    wstring text;
+    for (size_t i = from; i < to; ++i) text += glyphs[i];
+    return text;
+}
+
+wstring roomName(const GameContext& ctx) {
+    const auto found = ctx.rooms.find(ctx.player.getCurrentRoomId());
+    return found == ctx.rooms.end() ? L"未知" : fromUtf8(found->second.getName());
+}
+
+wstring roomShort(const string& id) {
+    if (id == "room_tree") return L"王";
+    if (id == "room_forest") return L"林";
+    if (id == "room_river") return L"河";
+    if (id == "room_cave") return L"洞";
+    if (id == "room_base") return L"基";
+    return L"?";
+}
+
+wstring progressBar(int value) {
+    value = clamp(value, 0, 100);
+    const int filled = value / 10;
+    return L"[" + wstring(static_cast<size_t>(filled), L'#') +
+           wstring(static_cast<size_t>(10 - filled), L'-') + L"] " +
+           to_wstring(value);
+}
+
+wstring seasonName(int turn) {
+    static const wchar_t* seasons[] = {L"春", L"夏", L"秋", L"冬"};
+    return seasons[seasonIndex(turn)];
+}
+
+wstring skillSummary(const Player& player) {
+    return L"技能 攀爬" + to_wstring(player.getSkillLevel(SkillType::Climb)) +
+           L" 战斗" + to_wstring(player.getSkillLevel(SkillType::Combat)) +
+           L" 领导" + to_wstring(player.getSkillLevel(SkillType::Leadership));
+}
+
+wstring inventorySummary(const Player& player) {
+    const auto& items = player.getInventory().getItems();
+    if (items.empty()) return L"空";
+    wstring summary;
+    for (const Item& item : items) {
+        if (!summary.empty()) summary += L"  ";
+        summary += fromUtf8(item.getName()) + L"x" +
+                   to_wstring(item.getCount());
+    }
+    return summary;
+}
+
+void replaceAll(wstring& text, const wstring& from,
+                const wstring& to) {
+    size_t position = 0;
+    while ((position = text.find(from, position)) != wstring::npos) {
+        text.replace(position, from.size(), to);
+        position += to.size();
+    }
+}
+
+}
+
+InteractiveGameUI::InteractiveGameUI(ConsoleRenderer& renderer)
+    : renderer_(renderer) {}
+
+void InteractiveGameUI::drawStableLine(Rect area, SHORT y,
+                                       const wstring& text,
+                                       Color color) {
+    const int width = area.right - area.left + 1;
+    wstring padded = renderer_.clip(text, width);
+    padded += wstring(static_cast<size_t>(max(
+        0, width - renderer_.columns(padded))), L' ');
+    const int key = static_cast<int>(area.left) * 65536 + y;
+    const auto previous = lastStableRows_.find(key);
+    if (previous != lastStableRows_.end() &&
+        previous->second.text == padded && previous->second.color == color)
+        return;
+    renderer_.drawTextIn(area, area.left, y, padded, color);
+    lastStableRows_[key] = {padded, color};
+}
+
+void InteractiveGameUI::appendLog(const string& text) {
+    historyScrollBack_ = 0;
+    wstring wide = fromUtf8(text);
+    // 地图模块保留自身接口文本；显示层统一隐藏已取消的 guide 命令。
+    replaceAll(wide, L"可输入 guide 查看游戏进度", L"请查看右侧当前目标");
+    replaceAll(wide, L"可输入 guide 查看下一步路线",
+               L"请查看右侧当前目标确认下一步路线");
+    replaceAll(wide, L"隐藏成就解锁：", L"\n【成就解锁】");
+    replaceAll(wide, L"隐藏结局：", L"\n【结局达成】");
+    replaceAll(wide, L"坏结局：", L"\n【结局达成】");
+    size_t start = 0;
+    do {
+        const size_t end = wide.find(L'\n', start);
+        const wstring line = wide.substr(
+            start, end == wstring::npos ? end : end - start);
+        const Color lineColor = isNumberedChoice(line)
+                                    ? Color::Hint
+                                    : messageColor(line);
+        for (const wstring& wrapped :
+             renderer_.wrapText(line, DIVIDER_X - 3))
+            history_.push_back({wrapped, lineColor});
+        if (end == wstring::npos) break;
+        start = end + 1;
+    } while (start <= wide.size());
+    if (history_.size() > 300)
+        history_.erase(history_.begin(), history_.end() - 300);
+}
+
+bool InteractiveGameUI::render(const GameContext& ctx,
+                               const InteractiveMap& map,
+                               const CombatSystem& combat,
+                               const string& objective) {
+    if (!renderer_.beginFrame(needsFullClear_)) return false;
+    const bool fullRedraw = renderer_.frameCleared();
+    const Rect LEFT_LOG{1, 19, DIVIDER_X - 1, static_cast<SHORT>(renderer_.inputTop() - 1)};
+    const Rect RIGHT_PANEL{DIVIDER_X + 1, 1, static_cast<SHORT>(renderer_.right() - 1),
+                           static_cast<SHORT>(renderer_.inputTop() - 1)};
+    needsFullClear_ = false;
+    if (fullRedraw) lastStableRows_.clear();
+
+    wstring mapTitle = L"【" + roomName(ctx) + L"】互动地图";
+    const int titlePadding = max(0, DIVIDER_X - 2 - renderer_.columns(mapTitle));
+    mapTitle += wstring(static_cast<size_t>(titlePadding), L' ');
+    renderer_.drawText(1, 1, mapTitle, Color::Title);
+    vector<MapTileVisual> currentTiles;
+    currentTiles.reserve(static_cast<size_t>(map.width() * map.height()));
+    for (int y = 0; y < map.height(); ++y) {
+        for (int x = 0; x < map.width(); ++x) {
+            const MapTileVisual tile = map.visualAt(x, y, ctx);
+            const size_t index = currentTiles.size();
+            currentTiles.push_back(tile);
+            if (fullRedraw || index >= lastMapTiles_.size() ||
+                tile.glyph != lastMapTiles_[index].glyph ||
+                tile.color != lastMapTiles_[index].color) {
+                // 地图每格固定占两列；补空格，免得一列宽的地板格只盖掉半个旧字形。
+                wstring glyph = renderer_.clip(tile.glyph, 2);
+                glyph += wstring(static_cast<size_t>(max(
+                    0, 2 - renderer_.columns(glyph))), L' ');
+                renderer_.drawText(static_cast<SHORT>(1 + x * 2),
+                                   static_cast<SHORT>(2 + y), glyph,
+                                   tile.color);
+            }
+        }
+    }
+    lastMapTiles_ = move(currentTiles);
+    if (fullRedraw) renderer_.drawHorizontalLine(18, 0, DIVIDER_X);
+    renderer_.drawText(1, 18, L"剧情记录 ", Color::Title);
+    const size_t capacity = LEFT_LOG.bottom - LEFT_LOG.top + 1;
+    const size_t maxBack = history_.size() > capacity
+                                    ? history_.size() - capacity : 0;
+    historyScrollBack_ = min(historyScrollBack_, maxBack);
+    const size_t end = history_.size() - historyScrollBack_;
+    const size_t first = end > capacity ? end - capacity : 0;
+    for (size_t row = 0; row < capacity; ++row) {
+        const size_t index = first + row;
+        const bool hasLine = index < end;
+        drawStableLine(LEFT_LOG, static_cast<SHORT>(LEFT_LOG.top + row),
+                       hasLine ? history_[index].text : L"",
+                       hasLine ? history_[index].color : Color::Normal);
+    }
+
+    const SHORT right = DIVIDER_X + 2;
+    renderer_.drawText(right, 1, L"【小地图】", Color::Title);
+    renderer_.drawText(right, 2, L"王--林--河--基", Color::Normal);
+    renderer_.drawText(right, 3, L"   |", Color::Wall);
+    renderer_.drawText(right, 4, L"   洞", Color::Normal);
+    drawStableLine(RIGHT_PANEL, 5,
+                   L"当前位置：" + roomShort(ctx.player.getCurrentRoomId()) +
+                       L" / " + roomName(ctx), Color::Hint);
+    renderer_.drawText(right, 6, L"门=切图  锁=未解锁", Color::Door);
+
+    renderer_.drawText(right, 9, L"【状态】", Color::Title);
+    drawStableLine(RIGHT_PANEL, 10,
+                   L"生命 " + progressBar(ctx.player.getHealth()),
+                   ctx.player.getHealth() <= 30 ? Color::Error : Color::Success);
+    drawStableLine(RIGHT_PANEL, 11,
+                   L"体力 " + progressBar(ctx.player.getStamina()), Color::Success);
+    drawStableLine(RIGHT_PANEL, 12,
+                   L"力量 " + to_wstring(ctx.player.getStrength()) +
+                       L"  智慧 " + to_wstring(ctx.player.getWisdom()) +
+                       L"  声望 " + to_wstring(ctx.player.getReputation()),
+                   Color::Normal);
+    drawStableLine(RIGHT_PANEL, 13,
+                   L"阶段 " + to_wstring(ctx.world.getStage()) + L"  " +
+                       seasonName(ctx.world.getTurnCount()) + L"季  食" +
+                       to_wstring(ctx.world.getResource(ResourceType::Food)) +
+                       L" 水" +
+                       to_wstring(ctx.world.getResource(ResourceType::Water)),
+                   Color::Normal);
+    drawStableLine(RIGHT_PANEL, 14, skillSummary(ctx.player), Color::Hint);
+    if (combat.isInBattle()) {
+        drawStableLine(RIGHT_PANEL, 15,
+                       L"战斗：" + fromUtf8(combat.getBattleState().enemyId) +
+                           L" HP " + to_wstring(combat.getBattleState().enemyHealth),
+                       Color::Error);
+    } else {
+        drawStableLine(RIGHT_PANEL, 15, L"", Color::Normal);
+    }
+    drawStableLine(RIGHT_PANEL, 16, L"背包 " +
+                   to_wstring(ctx.player.getInventory().getItems().size()) +
+                   L"/" + to_wstring(Inventory::MAX_SLOTS), Color::Title);
+    const auto inventoryLines = renderer_.wrapText(
+        inventorySummary(ctx.player), renderer_.right() - right);
+    for (size_t i = 0; i < 2; ++i)
+        drawStableLine(RIGHT_PANEL, static_cast<SHORT>(17 + i),
+                       i < inventoryLines.size()
+                           ? (i == 1 && inventoryLines.size() > 2
+                                  ? renderer_.clip(inventoryLines[i],
+                                                   renderer_.right() - right - 10) +
+                                        L"…按I查看"
+                                  : inventoryLines[i])
+                           : L"",
+                       Color::Item);
+
+    renderer_.drawText(right, 21, L"【当前目标】", Color::Title);
+    const auto objectiveLines = renderer_.wrapText(fromUtf8(objective),
+                                                   renderer_.right() - right);
+    for (size_t i = 0; i < 3; ++i)
+        drawStableLine(RIGHT_PANEL, static_cast<SHORT>(22 + i),
+                       i < objectiveLines.size() ? objectiveLines[i] : L"",
+                       Color::Hint);
+
+    const Rect bottom{1, static_cast<SHORT>(renderer_.inputTop() + 1),
+                      static_cast<SHORT>(renderer_.right() - 1), static_cast<SHORT>(renderer_.height() - 2)};
+    drawStableLine(bottom, static_cast<SHORT>(renderer_.inputTop() + 1),
+                   combat.isInBattle()
+                       ? L"战斗：输入指令后回车确认；按 P 存档（不消耗回合）"
+                       : L"WASD移动 ↑↓翻剧情 I背包 U物品 P存档 H帮助 Esc菜单",
+                   Color::Hint);
+    drawStableLine(bottom, renderer_.inputRow(), fromUtf8(map.nearbyHint(ctx)), Color::Hint);
+    if (fullRedraw) renderer_.drawFrame();
+    return true;
+}
+
+ExploreAction InteractiveGameUI::readExploreAction() {
+    while (true) {
+        const InputEvent event = renderer_.readEvent();
+        if (event.key == Key::EndOfInput) return ExploreAction::EndOfInput;
+        if (event.key == Key::Resize) { needsFullClear_ = true; return ExploreAction::None; }
+        if (event.key == Key::Up) {
+            historyScrollBack_ += 1;
+            return ExploreAction::HistoryUp;
+        }
+        if (event.key == Key::Down) {
+            historyScrollBack_ = 0;
+            return ExploreAction::HistoryDown;
+        }
+        if (event.key == Key::Left || event.key == Key::Right)
+            return ExploreAction::None;
+        if (event.key == Key::Enter) return ExploreAction::Interact;
+        if (event.key == Key::Escape) return ExploreAction::Menu;
+        if (event.key == Key::PageUp) {
+            historyScrollBack_ += 6;
+            return ExploreAction::HistoryUp;
+        }
+        if (event.key == Key::PageDown) {
+            historyScrollBack_ = historyScrollBack_ > 6
+                                     ? historyScrollBack_ - 6 : 0;
+            return ExploreAction::HistoryDown;
+        }
+        if ((event.key != Key::Text && event.key != Key::VirtualText) ||
+            event.text.empty()) continue;
+        wchar_t key = event.text.front();
+        if (key >= L'A' && key <= L'Z') key = key - L'A' + L'a';
+        if (key == L'w') return ExploreAction::MoveUp;
+        if (key == L's') return ExploreAction::MoveDown;
+        if (key == L'a') return ExploreAction::MoveLeft;
+        if (key == L'd') return ExploreAction::MoveRight;
+        if (key == L' ' || key == L'e') return ExploreAction::Interact;
+        if (key == L'i' || key == L'b') return ExploreAction::Inventory;
+        if (key == L'u') return ExploreAction::UseItem;
+        if (key == L'p' || key == L'k') return ExploreAction::Save;
+        if (key == L'h' || key == L'?') return ExploreAction::Help;
+        if (key == L'1') return ExploreAction::Choice1;
+        if (key == L'2') return ExploreAction::Choice2;
+        if (key == L'3') return ExploreAction::Choice3;
+        if (key == L'4') return ExploreAction::Choice4;
+    }
+}
+
+void InteractiveGameUI::drawTypedInput(
+    const wstring& prompt, const vector<wstring>& glyphs,
+    size_t caret) {
+    renderer_.clearInput();
+    const int promptWidth = renderer_.columns(prompt);
+    const int available = renderer_.right() - promptWidth - 2;
+    size_t start = caret;
+    int before = 0;
+    while (start > 0) {
+        const int width = renderer_.columns(glyphs[start - 1]);
+        if (before + width > available) break;
+        before += width;
+        --start;
+    }
+    renderer_.drawText(1, renderer_.inputRow(), prompt, Color::Hint);
+    renderer_.drawText(static_cast<SHORT>(1 + promptWidth), renderer_.inputRow(),
+                       renderer_.clip(joinGlyphs(glyphs, start, glyphs.size()),
+                                      available));
+    renderer_.showCursor(static_cast<SHORT>(1 + promptWidth + before),
+                         renderer_.inputRow(), true);
+}
+
+optional<string> InteractiveGameUI::readTypedCommand(
+    const wstring& prompt, bool battleSaveShortcut) {
+    vector<wstring> input;
+    size_t caret = 0;
+    drawTypedInput(prompt, input, caret);
+    while (true) {
+        const InputEvent event = renderer_.readEvent();
+        if (event.key == Key::EndOfInput || event.key == Key::Escape)
+            return nullopt;
+        if (event.key == Key::Resize) {
+            needsFullClear_ = true;
+            if (renderer_.beginFrame()) {
+                renderer_.drawFrame();
+                drawTypedInput(prompt, input, caret);
+            }
+            continue;
+        }
+        if (event.key == Key::Enter)
+            return toUtf8(joinGlyphs(input, 0, input.size()));
+        if (event.key == Key::Text) {
+            if (battleSaveShortcut && input.empty() &&
+                (event.text == L"p" || event.text == L"P"))
+                return "save";
+            const auto added = splitGlyphs(event.text);
+            input.insert(input.begin() + static_cast<ptrdiff_t>(caret),
+                         added.begin(), added.end());
+            caret += added.size();
+        } else if (event.key == Key::Backspace && caret > 0) {
+            input.erase(input.begin() + static_cast<ptrdiff_t>(--caret));
+        } else if (event.key == Key::Delete && caret < input.size()) {
+            input.erase(input.begin() + static_cast<ptrdiff_t>(caret));
+        } else if (event.key == Key::Left && caret > 0) {
+            --caret;
+        } else if (event.key == Key::Right && caret < input.size()) {
+            ++caret;
+        } else if (event.key == Key::Home) {
+            caret = 0;
+        } else if (event.key == Key::End) {
+            caret = input.size();
+        }
+        drawTypedInput(prompt, input, caret);
+    }
+}
+
+void InteractiveGameUI::centered(SHORT y, const wstring& text,
+                                 Color color) {
+    const int width = renderer_.columns(text);
+    const SHORT x = static_cast<SHORT>(max(1, (renderer_.right() - width) / 2));
+    renderer_.drawOverlayText(x, y, text, color);
+}
+
+int InteractiveGameUI::menu(const wstring& title,
+                            const vector<wstring>& options,
+                            int initial) {
+    int selected = clamp(initial, 0, static_cast<int>(options.size()) - 1);
+    while (true) {
+        renderer_.beginFrame();
+        renderer_.drawHorizontalLine(3, 16, renderer_.right() - 16);
+        renderer_.drawHorizontalLine(22, 16, renderer_.right() - 16);
+        centered(5, L"吗 喽 森 林", Color::Success);
+        centered(7, L"M O N K E Y   F O R E S T", Color::Title);
+        centered(9, title, Color::Hint);
+        for (size_t i = 0; i < options.size(); ++i) {
+            const wstring line =
+                (static_cast<int>(i) == selected ? L">  " : L"   ") + options[i];
+            centered(static_cast<SHORT>(12 + i * 2), line,
+                     static_cast<int>(i) == selected ? Color::Hint : Color::Normal);
+        }
+        centered(24, L"W/S或方向键选择 · Enter/空格确认 · Esc返回", Color::Wall);
+        const InputEvent event = renderer_.readEvent();
+        if (event.key == Key::EndOfInput) { needsFullClear_ = true; return -1; }
+        if (event.key == Key::Escape) { needsFullClear_ = true; return -1; }
+        const int optionCount = static_cast<int>(options.size());
+        if (event.key == Key::Up) selected = (selected + optionCount - 1) % optionCount;
+        if (event.key == Key::Down) selected = (selected + 1) % optionCount;
+        if (event.key == Key::Enter) { needsFullClear_ = true; return selected; }
+        if (event.key == Key::Text && !event.text.empty()) {
+            wchar_t key = event.text.front();
+            if (key == L'w' || key == L'W')
+                selected = (selected + optionCount - 1) % optionCount;
+            else if (key == L's' || key == L'S')
+                selected = (selected + 1) % optionCount;
+            else if (key == L' ') { needsFullClear_ = true; return selected; }
+        }
+    }
+}
+
+int InteractiveGameUI::showPauseMenu() {
+    return menu(L"暂 停",
+                {L"继续游戏", L"保存游戏", L"返回开始界面"});
+}
+
+int InteractiveGameUI::showMainMenu(bool hasAnySave, bool preferContinue) {
+    return menu(L"家 园 守 卫 战",
+                {L"新的开始", hasAnySave ? L"继续游戏" : L"继续游戏（暂无存档）",
+                 L"结局收集", L"成就系统", L"退出游戏"},
+                hasAnySave && preferContinue ? 1 : 0);
+}
+
+int InteractiveGameUI::showSlotMenu(
+    const wstring& title,
+    const vector<wstring>& slotDescriptions,
+    bool allowEmpty,
+    int preferredSlot) {
+    vector<wstring> options;
+    for (size_t i = 0; i < slotDescriptions.size(); ++i) {
+        wstring text = L"存档位 " + to_wstring(i + 1) + L"：" + slotDescriptions[i];
+        if (!allowEmpty && slotDescriptions[i] == L"空") text += L"（不可读取）";
+        options.push_back(text);
+    }
+    options.push_back(L"返回");
+    while (true) {
+        const int selected = menu(title, options,
+                                  preferredSlot >= 1 && preferredSlot <= 3
+                                      ? preferredSlot - 1 : 0);
+        if (selected < 0 || selected == static_cast<int>(options.size()) - 1)
+            return 0;
+        if (allowEmpty || slotDescriptions[static_cast<size_t>(selected)] != L"空")
+            return selected + 1;
+    }
+}
+
+void InteractiveGameUI::showTextPage(const wstring& title,
+                                     const wstring& text) {
+    const auto lines = renderer_.wrapText(text, renderer_.right() - 10);
+    constexpr size_t pageSize = 19;
+    size_t offset = 0;
+    const auto draw = [&]() {
+        renderer_.beginFrame();
+        centered(2, title, Color::Title);
+        for (size_t i = 0; i < pageSize && offset + i < lines.size(); ++i)
+            renderer_.drawOverlayText(5, static_cast<SHORT>(5 + i), lines[offset + i],
+                                      messageColor(lines[offset + i]));
+        centered(renderer_.height() - 3, L"↑↓滚动  PgUp/PgDn翻页  Enter/空格/Esc返回", Color::Hint);
+    };
+    draw();
+    while (true) {
+        const InputEvent event = renderer_.readEvent();
+        if (event.key == Key::Enter || event.key == Key::Escape ||
+            event.key == Key::EndOfInput ||
+            (event.key == Key::Text && event.text == L" ")) {
+            needsFullClear_ = true;
+            return;
+        }
+        const size_t maxOffset = lines.size() > pageSize
+                                          ? lines.size() - pageSize : 0;
+        if (event.key == Key::Up && offset > 0) --offset;
+        else if (event.key == Key::Down && offset < maxOffset) ++offset;
+        else if (event.key == Key::PageUp)
+            offset = offset > pageSize ? offset - pageSize : 0;
+        else if (event.key == Key::PageDown)
+            offset = min(maxOffset, offset + pageSize);
+        else if (event.key != Key::Resize) continue;
+        draw();
+    }
+}
+
+void InteractiveGameUI::showCollectionPage(
+    const wstring& title,
+    const wstring& summaryText,
+    const wstring& conditionsText) {
+    constexpr size_t pageSize = 19;
+    bool showConditions = false;
+    size_t offset = 0;
+
+    const auto wrapped = [&](bool detailed) {
+        return renderer_.wrapText(detailed ? conditionsText : summaryText,
+                                  renderer_.right() - 10);
+    };
+    auto lines = wrapped(showConditions);
+    const auto draw = [&]() {
+        const size_t maxOffset = lines.size() > pageSize
+                                          ? lines.size() - pageSize : 0;
+        offset = min(offset, maxOffset);
+        renderer_.beginFrame();
+        centered(2, title, Color::Title);
+        for (size_t i = 0; i < pageSize && offset + i < lines.size(); ++i)
+            renderer_.drawOverlayText(5, static_cast<SHORT>(5 + i),
+                                      lines[offset + i],
+                                      messageColor(lines[offset + i]));
+        centered(renderer_.height() - 3,
+                 showConditions
+                     ? L"Y已显示条件 · N隐藏条件 · ↑↓滚动 · Enter返回"
+                     : L"Y显示达成条件 · N保持隐藏 · ↑↓滚动 · Enter返回",
+                 Color::Hint);
+    };
+
+    draw();
+    while (true) {
+        const InputEvent event = renderer_.readEvent();
+        if (event.key == Key::Enter || event.key == Key::Escape ||
+            event.key == Key::EndOfInput ||
+            (event.key == Key::Text && event.text == L" ")) {
+            needsFullClear_ = true;
+            return;
+        }
+        if (event.key == Key::Text && !event.text.empty()) {
+            const wchar_t key = event.text.front();
+            if (key == L'y' || key == L'Y') {
+                showConditions = true;
+                lines = wrapped(true);
+                offset = 0;
+                draw();
+                continue;
+            }
+            if (key == L'n' || key == L'N') {
+                showConditions = false;
+                lines = wrapped(false);
+                offset = 0;
+                draw();
+                continue;
+            }
+        }
+        const size_t maxOffset = lines.size() > pageSize
+                                          ? lines.size() - pageSize : 0;
+        if (event.key == Key::Up && offset > 0) --offset;
+        else if (event.key == Key::Down && offset < maxOffset) ++offset;
+        else if (event.key == Key::PageUp)
+            offset = offset > pageSize ? offset - pageSize : 0;
+        else if (event.key == Key::PageDown)
+            offset = min(maxOffset, offset + pageSize);
+        else if (event.key != Key::Resize) continue;
+        draw();
+    }
+}
+
+void InteractiveGameUI::showEndingCinematic(const wstring& title,
+                                             const wstring& text) {
+    const auto lines = renderer_.wrapText(text, renderer_.right() - 16);
+    constexpr size_t pageSize = 23;
+    constexpr SHORT firstRow = 3;
+    size_t first = 0;
+    renderer_.beginFrame();
+    centered(2, title, Color::Title);
+    for (size_t revealed = 0; revealed < lines.size(); ++revealed) {
+        if (revealed >= first + pageSize) {
+            first = revealed - pageSize + 1;
+            renderer_.beginFrame();
+            centered(2, title, Color::Title);
+            for (size_t i = first; i <= revealed; ++i)
+                renderer_.drawOverlayText(8, static_cast<SHORT>(firstRow + i - first), lines[i],
+                                          messageColor(lines[i]));
+        } else {
+            renderer_.drawOverlayText(8, static_cast<SHORT>(firstRow + revealed - first),
+                                      lines[revealed], messageColor(lines[revealed]));
+        }
+        this_thread::sleep_for(chrono::seconds(1));
+    }
+
+    size_t offset = 0;
+    const auto draw = [&]() {
+        renderer_.beginFrame();
+        centered(2, title, Color::Title);
+        for (size_t i = 0; i < pageSize && offset + i < lines.size(); ++i)
+            renderer_.drawOverlayText(8, static_cast<SHORT>(firstRow + i), lines[offset + i],
+                                      messageColor(lines[offset + i]));
+        const size_t page = lines.empty() ? 1 : offset / pageSize + 1;
+        const size_t totalPages = lines.empty()
+            ? 1 : (lines.size() + pageSize - 1) / pageSize;
+        centered(renderer_.height() - 3,
+                 L"结局全文 第" + to_wstring(page) + L"/" +
+                     to_wstring(totalPages) +
+                     L"页 · ↑↓逐行 · PgUp/PgDn翻页 · Enter返回",
+                 Color::Hint);
+    };
+    draw();
+    while (true) {
+        const InputEvent event = renderer_.readEvent();
+        if (event.key == Key::Enter || event.key == Key::Escape ||
+            event.key == Key::EndOfInput ||
+            (event.key == Key::Text && event.text == L" ")) {
+            needsFullClear_ = true;
+            return;
+        }
+        const size_t maxOffset = lines.size() > pageSize
+                                          ? lines.size() - pageSize : 0;
+        if (event.key == Key::Up && offset > 0) --offset;
+        else if (event.key == Key::Down && offset < maxOffset) ++offset;
+        else if (event.key == Key::PageUp)
+            offset = offset > pageSize ? offset - pageSize : 0;
+        else if (event.key == Key::PageDown)
+            offset = min(maxOffset, offset + pageSize);
+        else if (event.key != Key::Resize) continue;
+        draw();
+    }
+}
+
+void InteractiveGameUI::clearLog() {
+    history_.clear();
+    historyScrollBack_ = 0;
+    lastStableRows_.clear();
+    needsFullClear_ = true;
+}
+
+}  // namespace UI

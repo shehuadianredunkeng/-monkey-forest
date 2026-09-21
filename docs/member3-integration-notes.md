@@ -20,7 +20,7 @@
 - NPC位置已写入五张地图：岩背/叶婆婆在猴王树，闪尾在果实森林，豆豆在河谷，赫兹在基地。
 - 战斗中的`use`直接调用4号`PlayerActions.h`提供的`useItem`。
 - 藤索被4号定义为关键物品，完成闪尾任务时仅检查并保留，不调用`removeItem`。
-- 新增`GameContext.h`兼容入口；实际类型仍沿用1号、4号`CommonTypes.h`中的定义。
+- `GameContext`类型定义在1号、4号的`CommonTypes.h`中，3号直接引用。
 - 4号主循环解析`talk 闪尾`后调用`talkToNPC("闪尾", ctx)`；若随后输入裸数字`1`，调用`chooseDialogueOption(1, ctx)`。
 - 不要要求玩家输入`talk 闪尾 1`或`talk 豆豆 2`；NPC系统会保存当前等待选择的对话对象。
 - 第四次成功使用逃跑后会产生闪尾邀请；4号主循环收到裸数字时，若存在
@@ -49,7 +49,7 @@
 - 旧存档加载后调用`syncLegacyFlags`，可把旧式旗标补录到收集系统。
 - 5号负责把收集旗标永久保存到独立收集文件；不要与普通存档一起覆盖。
 - 今日完整接口和各成员注意事项见`docs/member3-latest-integration-summary.md`。
-- `random`次数限制属于2号`EventSystem`，3号分支不直接修改该模块。
+- `random`次数限制属于2号`EventSystem`，3号不改该模块。
 - 5号需要按纯接口实现完整`WorldState`；3号测试中的状态实现仅用于独立测试。
 
 ## 战斗命令
