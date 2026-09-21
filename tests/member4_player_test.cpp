@@ -47,6 +47,7 @@ void testItemAndInventory()
            "Important item must be protected from deletion");
 
     Inventory full;
+    // 计数for循环正好加入12种物品，用来填满全部槽位。
     for (int i = 0; i < 12; ++i)
     {
         expect(full.addItem(Item("test_" + to_string(i), "测试物品")),
@@ -94,6 +95,7 @@ void testPlayerState()
     const SkillType skills[] = {SkillType::Climb,
                                 SkillType::Combat,
                                 SkillType::Leadership};
+    // 范围for循环用同一套边界检查测试三种技能。
     for (SkillType skill : skills)
     {
         expect(player.getSkillLevel(skill) == 1, "Initial skill level mismatch");
@@ -162,6 +164,7 @@ struct PickupFixture
 
 int countOf(const Player& player, const string& id)
 {
+    // 范围for循环查找指定物品；背包中每个ID只保留一个槽位。
     for (const auto& item : player.getInventory().getItems())
     {
         if (item.getId() == id)
@@ -210,6 +213,7 @@ void testConsumableUseRemovesExactlyOne()
 void testPlotItemsAreNotConsumed()
 {
     PickupFixture f({});
+    // 范围for循环依次验证三件关键道具都不会被直接消耗。
     for (const auto* id : {"item_chip", "item_rope", "item_flint"})
     {
         expect(f.player.addItem(Item(id, "关键物品", true, 1)), "Add plot item");
@@ -330,6 +334,7 @@ int main()
         {"empty inventory display", testEmptyInventoryShowsZeroSlots},
     };
     int failed = 0;
+    // 范围for循环逐项执行测试；异常表示该项测试失败。
     for (const auto& test : tests)
     {
         try

@@ -33,7 +33,7 @@ struct ItemInfo
     bool important;
 };
 
-// 玩家可以输入物品名，也可以输入界面上显示的英文简称。
+// 文件内部查询函数：玩家可以输入物品名，也可以输入界面上的英文简称。
 const ItemInfo* findItemInfo(const string& target)
 {
     static constexpr ItemInfo items[] = {
@@ -51,6 +51,7 @@ const ItemInfo* findItemInfo(const string& target)
         {"item_autumn_token", "秋叶", "autumn", "秋叶", true},
         {"item_winter_token", "落雪", "winter", "落雪", true},
     };
+    // 范围for循环逐个检查物品表，匹配成功就提前返回。
     for (const auto& item : items)
     {
         if (target == item.id || target == item.name ||
@@ -64,6 +65,7 @@ const ItemInfo* findItemInfo(const string& target)
 
 } // namespace
 
+// 普通自由函数，不属于Player类；它完成一次指定物品的拾取。
 ActionResult takeItem(const string& itemId, GameContext& ctx)
 {
     // 先确认玩家所在房间有效，再检查房间里有没有目标物品。
@@ -94,6 +96,7 @@ ActionResult takeItem(const string& itemId, GameContext& ctx)
     return makeResult(true, "你拾取了：" + string(item->name) + "。", true);
 }
 
+// 普通自由函数，根据统一后的物品ID选择对应的使用效果。
 ActionResult useItem(const string& itemId, GameContext& ctx)
 {
     // 后面的判断都使用统一ID，中文名和英文简称只在这里转换一次。
@@ -183,6 +186,7 @@ ActionResult useItem(const string& itemId, GameContext& ctx)
     return makeResult(false, "该物品当前无法使用。", false);
 }
 
+// 查询型自由函数，参数是const引用，所以不会改变玩家背包。
 string showInventory(const Player& player)
 {
     const auto& items = player.getInventory().getItems();
@@ -194,6 +198,7 @@ string showInventory(const Player& player)
     // 显示名称来自上面的物品表，不把item_fruit这类内部ID给玩家看。
     ostringstream output;
     output << "背包 " << items.size() << "/" << Inventory::MAX_SLOTS;
+    // 范围for循环按vector中的存放顺序输出每一种物品。
     for (const Item& item : items)
     {
         const auto* info = findItemInfo(item.getId());

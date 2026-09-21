@@ -11,6 +11,7 @@ bool Inventory::addItem(const Item& item)
         return false;
     }
 
+    // find_if内部按顺序遍历vector，找到相同ID就停止。
     auto existing = find_if(
         items.begin(),
         items.end(),
@@ -35,6 +36,7 @@ bool Inventory::addItem(const Item& item)
 
 bool Inventory::removeItem(const string& itemId)
 {
+    // 同样使用线性查找，因为背包最多只有12个槽位。
     auto existing = find_if(
         items.begin(),
         items.end(),
@@ -57,6 +59,7 @@ bool Inventory::removeItem(const string& itemId)
 
 bool Inventory::hasItem(const string& itemId) const
 {
+    // any_of依次检查物品，只要有一个ID相同就返回true。
     return any_of(
         items.cbegin(),
         items.cend(),

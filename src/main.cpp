@@ -35,6 +35,7 @@ using namespace std;
 
 namespace {
 
+// 初始化辅助函数：处理Windows控制台编码和程序工作目录。
 void configureApplication() {
 #ifdef _WIN32
     // 统一使用UTF-8，并把存档放到程序所在目录。
@@ -50,6 +51,7 @@ void configureApplication() {
 #endif
 }
 
+// 初始化辅助函数：给一局新游戏设置默认世界数据。
 void initializeNewWorld(WorldState& world) {
     // 新游戏从第一阶段和默认资源开始。
     world.setStage(1);
@@ -60,11 +62,13 @@ void initializeNewWorld(WorldState& world) {
     world.setResource(ResourceType::MigrationSupply, 0);
 }
 
+// 结果构造辅助函数：把一次操作的四项结果集中组装起来。
 ActionResult result(bool success, string message,
                     bool turn = false, bool stage = false) {
     return {success, move(message), turn, stage};
 }
 
+// 判断辅助函数：只有这些地图目标在互动成功后需要扣体力。
 bool consumesMapInteractionStamina(InteractionKind kind) {
     return kind == InteractionKind::Item || kind == InteractionKind::Chest ||
            kind == InteractionKind::Enemy || kind == InteractionKind::Quest ||
@@ -72,6 +76,7 @@ bool consumesMapInteractionStamina(InteractionKind kind) {
            kind == InteractionKind::RandomEvent;
 }
 
+// 结算辅助函数：根据互动类型扣除体力，并补充提示文字。
 ActionResult chargeMapInteractionStamina(InteractionKind kind,
                                          ActionResult action,
                                          GameContext& ctx) {
@@ -83,16 +88,20 @@ ActionResult chargeMapInteractionStamina(InteractionKind kind,
     return action;
 }
 
+// 字符串辅助函数：用两个while循环去掉首尾空白字符。
 string trim(const string& text) {
     size_t first = 0;
+    // 第一个while从左向右找第一个非空白字符。
     while (first < text.size() &&
            isspace(static_cast<unsigned char>(text[first]))) ++first;
     size_t last = text.size();
+    // 第二个while从右向左找最后一个非空白字符。
     while (last > first &&
            isspace(static_cast<unsigned char>(text[last - 1]))) --last;
     return text.substr(first, last - first);
 }
 
+// 字符串辅助函数：while循环持续读取，直到输入流中没有下一个单词。
 vector<string> words(const string& text) {
     istringstream input(text);
     vector<string> result;
@@ -101,12 +110,14 @@ vector<string> words(const string& text) {
     return result;
 }
 
+// 字符串辅助函数：范围for循环逐个处理英文字符，中文不会受影响。
 string lowerAscii(string text) {
     for (char& ch : text)
         if (ch >= 'A' && ch <= 'Z') ch = static_cast<char>(ch - 'A' + 'a');
     return text;
 }
 
+// 查询辅助函数：根据世界标记判断下一场应开始的战斗。
 string pendingEnemyId(const WorldState& world) {
     // 剧情先设置待战标记，回到主循环后再真正进入战斗。
     if (world.hasFlag("flag_pending_battle_bees") &&
@@ -119,6 +130,7 @@ string pendingEnemyId(const WorldState& world) {
 }
 
 bool hasPendingMainChoice(const WorldState& world) {
+    // 范围for循环遍历所有标记，找到待选择事件就提前结束。
     for (const string& flag : world.getFlags())
         if (flag.rfind("flag_pending_event_", 0) == 0) return true;
     return false;
@@ -136,6 +148,7 @@ string seasonName(int turn) {
     return names[seasonIndex(turn)];
 }
 
+// 条件查询函数：检查玩家是否满足至少一条最终路线。
 bool hasAnyFinalRoute(const GameContext& ctx) {
     // 第六阶段至少满足一条路线，才会进入对应的正常结局选择。
     const bool resist = ctx.world.hasFlag("flag_route_resist_ready") &&
@@ -151,6 +164,7 @@ bool hasAnyFinalRoute(const GameContext& ctx) {
     return resist || hack || migrate || hasAllSeasonalRelics(ctx.world);
 }
 
+// 显示辅助函数：根据当前阶段和标记生成右侧任务目标。
 string objective(const GameContext& ctx) {
     if (ctx.world.hasFlag("flag_pending_scout_wander_choice"))
         return "闪尾正在等待答复：直接按 1 接受，或按 2 拒绝。";
@@ -184,6 +198,7 @@ string roomArrival(const GameContext& ctx) {
               found->second.getBaseDescription();
 }
 
+// 地图动作函数：把场景物品放进背包，并记录已经拾取的标记。
 ActionResult takeMapItem(const string& itemId, GameContext& ctx) {
     // 拾取标记写进世界状态，读档后物品不会重新出现。
     const string flag = "flag_taken_" + ctx.player.getCurrentRoomId() +
@@ -194,6 +209,7 @@ ActionResult takeMapItem(const string& itemId, GameContext& ctx) {
     return picked;
 }
 
+// 地图动作函数：根据宝箱ID发放固定奖励。
 ActionResult openChest(const string& chestId, GameContext& ctx) {
     // 每个宝箱只结算一次，背包满时先不写打开标记。
     const string flag = "flag_opened_" + chestId;
@@ -217,6 +233,7 @@ ActionResult openChest(const string& chestId, GameContext& ctx) {
     return result(true, "咔哒！你打开宝箱，获得" + text + "。", true);
 }
 
+// 地图动作函数：处理四季信物和其他隐藏奖励。
 ActionResult findEasterEgg(const string& eggId, GameContext& ctx) {
     const string flag = "flag_found_" + eggId;
     if (ctx.world.hasFlag(flag)) return result(false, "这里的秘密已经被发现了。");
@@ -261,6 +278,7 @@ ActionResult findEasterEgg(const string& eggId, GameContext& ctx) {
                   true);
 }
 
+// 地图动作函数：按照当前回合数轮换五种随机地点奖励。
 ActionResult resolveLocationEvent(const string& eventId,
                                   GameContext& ctx) {
     const string flag = "flag_resolved_" + eventId;
@@ -334,6 +352,7 @@ string specialEndingId(const GameContext& ctx,
     return endings.determineEndingId(ctx);
 }
 
+// 结算函数：统一推进回合/阶段，并把结果加入界面日志。
 void applyResult(const ActionResult& action, GameContext& ctx,
                  ProgressSystem& progress, EventSystem& events,
                  UI::InteractiveGameUI& ui) {
@@ -381,6 +400,7 @@ void updateProfile(GameContext& ctx, WorldState& profile,
     saveCollectionProfile("collection_profile.txt", profile);
 }
 
+// 战斗指令处理函数：解析输入，再交给CombatSystem执行。
 void handleBattleCommand(const string& line, GameContext& ctx,
                          CombatSystem& combat, EventSystem& events,
                          ProgressSystem& progress, UI::InteractiveGameUI& ui,
@@ -427,8 +447,11 @@ void handleBattleCommand(const string& line, GameContext& ctx,
     }
 }
 
+// 枚举类型记录一轮游戏退出的原因，主菜单据此决定下一步。
 enum class GameExit { Menu, Ending, Closed };
 
+// 游戏主流程函数：普通自由函数，不属于某个类。
+// 函数中的while(true)是事件循环，只有返回菜单、结局或关闭窗口时结束。
 GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
               SaveSlots& slots, SaveManager& saveManager,
               WorldState& profile, CollectionSystem& collections) {
@@ -676,6 +699,7 @@ GameExit play(GameContext& ctx, UI::InteractiveGameUI& ui,
 
 }  // namespace
 
+// 程序入口函数：建立界面和各系统对象，并负责主菜单与每轮游戏的切换。
 int main() {
 #ifndef _WIN32
     return 1;
@@ -691,6 +715,7 @@ int main() {
 
     bool preferContinue = false;
     // 每次从一轮游戏返回后都会重新显示主菜单。
+    // 这是主菜单循环，用户选择退出或关闭窗口时才break。
     while (true) {
         const int selected = ui.showMainMenu(slots.any(), preferContinue);
         preferContinue = false;

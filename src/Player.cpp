@@ -6,6 +6,7 @@ using namespace std;
 
 namespace
 {
+// 文件内部辅助函数，不属于Player类，只在本文件中使用。
 // 玩家数值统一在这里限制上下界。
 int changeValue(int value, int delta, int minimum, int maximum)
 {

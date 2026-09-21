@@ -10,6 +10,7 @@ Item::Item(string id, string name, int count)
 {
 }
 
+// 上面的三参数构造函数委托给这个完整构造函数，避免重复初始化代码。
 Item::Item(string id, string name, bool important, int count)
     : id(move(id)),
       name(move(name)),
