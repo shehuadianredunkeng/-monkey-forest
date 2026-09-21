@@ -13,7 +13,8 @@ void expect(bool ok, const char* message) {
     if (!ok) throw std::runtime_error(message);
 }
 
-// Only replace the OS device. Layout, wrapping, editor and model adapter are real.
+//这里只替换实际的控制台设备，排版、换行、输入编辑和数据转换仍使用正式代码，因此测试结果可以反映真实界面的显示情况。
+
 struct RecordingSurface final : UI::ConsoleSurface {
     struct Write { int x; int y; std::wstring text; UI::Color color; };
     std::vector<Write> writes;
@@ -63,7 +64,7 @@ void textCases() {
     expect(!UI::fromUtf8(std::string(1, '\xff')).empty(), "invalid UTF-8 replaced");
     expect(UI::clipText(L"A\tB\x1b", 20, measure).find(L'\x1b') == std::wstring::npos,
            "escape/control characters must not reach console");
-    // A host may display ambiguous symbols differently. Use its measured width.
+    //不同终端对部分字符宽度的判断可能不同，测试时应采用设备实际测量的宽度。
     auto wideA = [](const std::wstring& glyph) { return glyph == L"A" ? 2 : UI::portableColumns(glyph); };
     expect(UI::wrapText(L"AAA", 3, wideA) == std::vector<std::wstring>({L"A", L"A", L"A"}),
            "must use device measurement instead of string size");
