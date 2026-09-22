@@ -4,3 +4,8 @@ release-interactive/
 build/
 __cmake_systeminformation/
 *.zip
+*.obj
+*.o
+*.exe
+*.pdb
+*.ilk
