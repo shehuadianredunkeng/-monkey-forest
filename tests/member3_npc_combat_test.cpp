@@ -580,7 +580,7 @@ void testNpcPlacementMatchesQuestFlow() {
 }
 
 void testBattleActionsOnlyRefreshMapAfterLeavingBattle() {
-    auto withFreshBattle = [](const string& enemyId, auto&& body) {
+    auto withFreshBattle = [](auto&& body) {
         worlds.clear();
         Player player;
         WorldState world;
@@ -594,7 +594,7 @@ void testBattleActionsOnlyRefreshMapAfterLeavingBattle() {
                                    const string& action,
                                    const string& target = "",
                                    bool setupForHertz = false) {
-        withFreshBattle(enemyId, [&](GameContext& ctx, CombatSystem& combat) {
+        withFreshBattle([&](GameContext& ctx, CombatSystem& combat) {
             if (setupForHertz) {
                 ctx.player.changeWisdom(3);
                 ctx.world.setFlag("flag_complete_log");
@@ -620,7 +620,7 @@ void testBattleActionsOnlyRefreshMapAfterLeavingBattle() {
     expectOngoingAction("enemy_robot", "use", "item_herb");
     expectOngoingAction("enemy_hertz", "analyze", "", true);
 
-    withFreshBattle("enemy_hertz", [](GameContext& ctx, CombatSystem& combat) {
+    withFreshBattle([](GameContext& ctx, CombatSystem& combat) {
         ctx.world.setFlag("flag_scout_banana_promise");
         ctx.world.setFlag("flag_scout_help");
         expect(combat.startBattle("enemy_hertz", ctx).success, "hertz setup failed");
@@ -629,7 +629,7 @@ void testBattleActionsOnlyRefreshMapAfterLeavingBattle() {
                "banana choice must not refresh map while battle continues");
     });
 
-    withFreshBattle("enemy_hertz", [](GameContext& ctx, CombatSystem& combat) {
+    withFreshBattle([](GameContext& ctx, CombatSystem& combat) {
         ctx.world.setFlag("flag_scout_banana_promise");
         ctx.world.setFlag("flag_scout_help");
         ctx.world.setFlag("flag_scout_left");
@@ -640,7 +640,7 @@ void testBattleActionsOnlyRefreshMapAfterLeavingBattle() {
                "departed scout must not participate in the Hertz banana scene");
     });
 
-    withFreshBattle("enemy_bees", [](GameContext& ctx, CombatSystem& combat) {
+    withFreshBattle([](GameContext& ctx, CombatSystem& combat) {
         ctx.player.changeStrength(20);
         expect(combat.startBattle("enemy_bees", ctx).success, "victory setup failed");
         ActionResult victory;
@@ -650,7 +650,7 @@ void testBattleActionsOnlyRefreshMapAfterLeavingBattle() {
                "victory should refresh map once after leaving battle");
     });
 
-    withFreshBattle("enemy_raider", [](GameContext& ctx, CombatSystem& combat) {
+    withFreshBattle([](GameContext& ctx, CombatSystem& combat) {
         ctx.world.setFlag("flag_skill_escape_unlocked");
         ctx.world.setFlag("flag_scout_help");
         expect(combat.startBattle("enemy_raider", ctx).success, "escape setup failed");
